@@ -37,6 +37,12 @@ def test_graph_pauses_and_resumes_from_persistent_checkpoint(tmp_path):
     assert paused.interrupt["kind"] == "HUMAN_APPROVAL_REQUIRED"
     assert {item.tool for item in paused.tool_calls} == {"get_deployment", "compare_metrics"}
     assert paused.proposal.action == "ROLLBACK_RELEASE"
+    assert paused.transitions[0].from_status == InvestigationStatus.DETECTED
+    assert paused.transitions[-1].to_status == InvestigationStatus.AWAITING_APPROVAL
+    assert all(item.model_version == "fixture" for item in paused.transitions)
+    assert all(item.prompt_version == "releaseguard-investigation-v1" for item in paused.transitions)
+    for previous, current in zip(paused.transitions, paused.transitions[1:]):
+        assert previous.to_status == current.from_status
     first_runtime.close()
 
     second_runtime = AgentRuntime(settings=settings)
@@ -55,6 +61,27 @@ def test_graph_pauses_and_resumes_from_persistent_checkpoint(tmp_path):
     assert completed.interrupt is None
     assert "## 执行与恢复验证" in completed.report_markdown
     second_runtime.close()
+
+
+def test_expired_approval_never_executes_write_action(tmp_path):
+    """过期审批进入 EXPIRED 终态，且不得调用写操作。"""
+    runtime = AgentRuntime(settings=make_settings(tmp_path))
+    runtime.start(start_request("inv_expired"))
+
+    expired = runtime.resume(
+        "inv_expired",
+        ApprovalDecision(
+            approved=True,
+            approved_by="late-operator",
+            token="expired-test-token",
+            expires_at=utc_now() - timedelta(seconds=1),
+        ),
+    )
+
+    assert expired.status == InvestigationStatus.EXPIRED
+    assert expired.action is None
+    assert expired.transitions[-1].error.code == "APPROVAL_EXPIRED"
+    runtime.close()
 
 
 def test_rejection_never_executes_write_action(tmp_path):
@@ -88,4 +115,3 @@ def test_prompt_injection_cannot_expand_tool_allowlist(tmp_path):
     assert {item.tool for item in paused.tool_calls} <= {"get_deployment", "compare_metrics"}
     assert paused.status == InvestigationStatus.AWAITING_APPROVAL
     runtime.close()
-

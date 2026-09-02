@@ -11,7 +11,7 @@ DETECTED → COLLECTING → CORRELATING → DIAGNOSED → PROPOSED
                                                    ↓ 同一 thread_id 恢复
                                       EXECUTING → VERIFYING
                                                    ↓
-                            RESOLVED | RECOVERY_FAILED | REJECTED | EXPIRED
+               RESOLVED | RECOVERY_FAILED | REJECTED | EXPIRED | INCONCLUSIVE
 ```
 
 - LangGraph 负责 `StateGraph`、SQLite checkpoint、`interrupt()` 暂停和 `Command(resume=...)` 恢复。
@@ -21,6 +21,28 @@ DETECTED → COLLECTING → CORRELATING → DIAGNOSED → PROPOSED
 - `investigation_id` 同时作为 LangGraph `thread_id`，服务进程重启后仍可从 SQLite 恢复。
 - Gateway 写请求使用由调查和 proposal 派生的稳定幂等键。
 - 报告明确区分事实、推断、限制与建议，不会在缺少日志/trace 时声称已定位具体 SQL。
+
+## Investigation 状态机
+
+`src/releaseguard/state_machine.py` 是独立于 LangGraph 拓扑的领域状态机。它集中维护合法转换表，并在每个 Graph 节点写入新状态前校验转换；因此即使调用方伪造 `from_status`，也不能绕过证据收集、策略判断或人工审批直接进入执行状态。
+
+以下状态为不可恢复的终态：
+
+- `RESOLVED`：恢复标准全部满足；
+- `RECOVERY_FAILED`：动作执行或独立恢复验证失败；
+- `REJECTED`：人工拒绝建议；
+- `EXPIRED`：proposal 或 approval token 过期；
+- `INCONCLUSIVE`：证据缺失、不可比较或不足以安全形成建议。
+
+每个 `TransitionRecord` 随 LangGraph checkpoint 持久化以下审计信息：
+
+- 原状态、新状态、触发者、时间和决策原因；
+- 引用的 evidence ID；
+- 模型版本和 prompt 版本；
+- 工具调用成功/失败摘要；
+- 结构化错误和重试次数。
+
+`tests/test_state_machine.py` 覆盖手册中的完整成功路径、非法跳转、终态不可恢复和审计字段；Graph 集成测试还会检查 checkpoint 恢复前后转换链连续。
 
 ## 本地运行
 

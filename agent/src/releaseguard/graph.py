@@ -30,11 +30,11 @@ from releaseguard.domain import (
     InvestigationStatus,
     RootCauseFinding,
     ToolCallRecord,
-    TransitionRecord,
     utc_now,
 )
 from releaseguard.gateway import GatewayError, OpsGateway
 from releaseguard.report import render_report
+from releaseguard.state_machine import InvestigationStateMachine, TransitionActor
 from releaseguard.tools import build_read_tools, deployment_evidence, metrics_evidence
 
 
@@ -79,6 +79,7 @@ class ReleaseGuardGraph:
         self.tools = build_read_tools(gateway)
         self.tool_by_name: dict[str, BaseTool] = {tool.name: tool for tool in self.tools}
         self.model = model.bind_tools(self.tools)
+        self.state_machine = InvestigationStateMachine(model_version=settings.model)
         self.compiled = self._build().compile(checkpointer=checkpointer, name="releaseguard-mvp")
 
     def _build(self) -> StateGraph[AgentState]:
@@ -119,22 +120,28 @@ class ReleaseGuardGraph:
         graph.add_edge("report", END)
         return graph
 
-    @staticmethod
     def _transition(
+        self,
         from_status: InvestigationStatus,
         to_status: InvestigationStatus,
-        actor: str,
+        actor: TransitionActor,
         reason: str,
         evidence_ids: list[str] | None = None,
+        *,
+        tool_calls: list[dict[str, Any]] | None = None,
+        error: dict[str, Any] | None = None,
+        retry_count: int = 0,
     ) -> dict[str, Any]:
-        """创建统一状态转换审计记录。"""
-        return TransitionRecord(
+        """通过领域状态机校验并创建统一审计记录。"""
+        return self.state_machine.transition(
             from_status=from_status,
             to_status=to_status,
             actor=actor,
-            occurred_at=utc_now(),
             reason=reason,
             evidence_ids=evidence_ids or [],
+            tool_calls=tool_calls or [],
+            error=error,
+            retry_count=retry_count,
         ).model_dump(mode="json")
 
     def prepare(self, state: AgentState) -> dict[str, Any]:
@@ -159,7 +166,7 @@ class ReleaseGuardGraph:
             "model_calls": 0,
             "transitions": [
                 self._transition(
-                    InvestigationStatus.DETECTED,
+                    InvestigationStatus(state["status"]),
                     InvestigationStatus.COLLECTING,
                     "agent",
                     "开始收集发布与遥测证据",
@@ -336,11 +343,12 @@ class ReleaseGuardGraph:
         evidence_ids = [item["evidence_id"] for item in state.get("evidence", [])]
         transitions = [
             self._transition(
-                InvestigationStatus.COLLECTING,
+                InvestigationStatus(state["status"]),
                 InvestigationStatus.CORRELATING,
                 "agent",
                 "开始确定性发布关联",
                 evidence_ids,
+                tool_calls=state.get("tool_calls", []),
             )
         ]
         deployment = state.get("deployment_context")
@@ -353,6 +361,8 @@ class ReleaseGuardGraph:
                     "agent",
                     "部署或指标证据缺失，安全降级为 HOLD",
                     evidence_ids,
+                    tool_calls=state.get("tool_calls", []),
+                    error={"code": "MISSING_REQUIRED_EVIDENCE", "phase": "correlate"},
                 )
             )
             return {
@@ -380,6 +390,7 @@ class ReleaseGuardGraph:
                     "agent",
                     "未发现满足阈值的 candidate 回归，建议 HOLD",
                     evidence_ids,
+                    tool_calls=state.get("tool_calls", []),
                 )
             )
             return {
@@ -437,6 +448,7 @@ class ReleaseGuardGraph:
                     "agent",
                     "发布证据与指标回归满足 grounding 规则",
                     cited,
+                    tool_calls=state.get("tool_calls", []),
                 ),
                 self._transition(
                     InvestigationStatus.DIAGNOSED,
@@ -444,6 +456,7 @@ class ReleaseGuardGraph:
                     "policy",
                     "确定性策略将 rollback 判定为 MEDIUM 并要求人工审批",
                     cited,
+                    tool_calls=state.get("tool_calls", []),
                 ),
             ]
         )
@@ -468,11 +481,12 @@ class ReleaseGuardGraph:
             "status": InvestigationStatus.AWAITING_APPROVAL.value,
             "transitions": [
                 self._transition(
-                    InvestigationStatus.PROPOSED,
+                    InvestigationStatus(state["status"]),
                     InvestigationStatus.AWAITING_APPROVAL,
                     "policy",
                     "等待短时效人工审批",
                     state["proposal"]["evidence_ids"],
+                    tool_calls=state.get("tool_calls", []),
                 )
             ],
         }
@@ -495,10 +509,11 @@ class ReleaseGuardGraph:
                 "approval": decision.model_dump(mode="json"),
                 "transitions": [
                     self._transition(
-                        InvestigationStatus.AWAITING_APPROVAL,
+                        InvestigationStatus(state["status"]),
                         InvestigationStatus.REJECTED,
                         "user",
                         f"审批人 {decision.approved_by} 拒绝动作",
+                        tool_calls=state.get("tool_calls", []),
                     )
                 ],
             }
@@ -508,10 +523,12 @@ class ReleaseGuardGraph:
                 "approval": decision.model_dump(mode="json"),
                 "transitions": [
                     self._transition(
-                        InvestigationStatus.AWAITING_APPROVAL,
+                        InvestigationStatus(state["status"]),
                         InvestigationStatus.EXPIRED,
                         "policy",
                         "proposal 或 approval token 已过期",
+                        tool_calls=state.get("tool_calls", []),
+                        error={"code": "APPROVAL_EXPIRED", "phase": "approval"},
                     )
                 ],
             }
@@ -522,10 +539,11 @@ class ReleaseGuardGraph:
             "approval": approval,
             "transitions": [
                 self._transition(
-                    InvestigationStatus.AWAITING_APPROVAL,
+                    InvestigationStatus(state["status"]),
                     InvestigationStatus.EXECUTING,
                     "user",
                     f"审批人 {decision.approved_by} 批准动作",
+                    tool_calls=state.get("tool_calls", []),
                 )
             ],
         }
@@ -550,10 +568,23 @@ class ReleaseGuardGraph:
                 "errors": [{"code": exc.code, "request_id": exc.request_id, "phase": "execute"}],
                 "transitions": [
                     self._transition(
-                        InvestigationStatus.EXECUTING,
+                        InvestigationStatus(state["status"]),
                         InvestigationStatus.RECOVERY_FAILED,
                         "gateway",
                         f"Gateway 拒绝或未能执行动作：{exc.code}",
+                        tool_calls=[
+                            *state.get("tool_calls", []),
+                            {
+                                "tool": "submit_rollback",
+                                "succeeded": False,
+                                "error_code": exc.code,
+                            },
+                        ],
+                        error={
+                            "code": exc.code,
+                            "phase": "execute",
+                            "message": "Gateway 未能接受或完成 rollback 请求",
+                        },
                     )
                 ],
             }
@@ -562,10 +593,14 @@ class ReleaseGuardGraph:
             "action": action,
             "transitions": [
                 self._transition(
-                    InvestigationStatus.EXECUTING,
+                    InvestigationStatus(state["status"]),
                     InvestigationStatus.VERIFYING,
                     "gateway",
                     "动作已提交，开始读取平台独立验证结果",
+                    tool_calls=[
+                        *state.get("tool_calls", []),
+                        {"tool": "submit_rollback", "succeeded": True},
+                    ],
                 )
             ],
         }
@@ -585,10 +620,23 @@ class ReleaseGuardGraph:
                 ],
                 "transitions": [
                     self._transition(
-                        InvestigationStatus.VERIFYING,
+                        InvestigationStatus(state["status"]),
                         InvestigationStatus.RECOVERY_FAILED,
                         "gateway",
                         f"无法完成独立恢复验证：{exc.code}",
+                        tool_calls=[
+                            *state.get("tool_calls", []),
+                            {
+                                "tool": "verify_recovery",
+                                "succeeded": False,
+                                "error_code": exc.code,
+                            },
+                        ],
+                        error={
+                            "code": exc.code,
+                            "phase": "verify",
+                            "message": "恢复验证所需的动作或部署状态不可用",
+                        },
                     )
                 ],
             }
@@ -610,10 +658,27 @@ class ReleaseGuardGraph:
             "action": action,
             "transitions": [
                 self._transition(
-                    InvestigationStatus.VERIFYING,
+                    InvestigationStatus(state["status"]),
                     status,
                     "gateway",
                     reason,
+                    tool_calls=[
+                        *state.get("tool_calls", []),
+                        {
+                            "tool": "verify_recovery",
+                            "succeeded": recovered,
+                            "error_code": None if recovered else "RECOVERY_CRITERIA_NOT_MET",
+                        },
+                    ],
+                    error=(
+                        None
+                        if recovered
+                        else {
+                            "code": "RECOVERY_CRITERIA_NOT_MET",
+                            "phase": "verify",
+                            "message": "动作状态、目标版本或 rollout 稳定性未满足恢复标准",
+                        }
+                    ),
                 )
             ],
         }

@@ -131,6 +131,22 @@ class StartInvestigation(StrictModel):
     investigation_id: str | None = Field(default=None, pattern=r"^inv_[a-zA-Z0-9_-]+$")
 
 
+class TransitionToolSummary(StrictModel):
+    """状态转换时保存的最小工具调用摘要。"""
+
+    tool: str
+    succeeded: bool
+    error_code: str | None = None
+
+
+class TransitionError(StrictModel):
+    """状态转换关联的结构化错误摘要。"""
+
+    code: str
+    phase: str | None = None
+    message: str | None = None
+
+
 class TransitionRecord(StrictModel):
     """一次可审计的状态转换。"""
 
@@ -140,6 +156,11 @@ class TransitionRecord(StrictModel):
     occurred_at: datetime
     reason: str
     evidence_ids: list[str] = Field(default_factory=list)
+    model_version: str = Field(default="unknown", min_length=1)
+    prompt_version: str = Field(default="unknown", min_length=1)
+    tool_calls: list[TransitionToolSummary] = Field(default_factory=list)
+    error: TransitionError | None = None
+    retry_count: int = Field(default=0, ge=0)
 
 
 class ToolCallRecord(StrictModel):
@@ -171,4 +192,3 @@ class RunView(StrictModel):
     errors: list[dict[str, Any]] = Field(default_factory=list)
     interrupt: dict[str, Any] | None = None
     report_markdown: str | None = None
-
