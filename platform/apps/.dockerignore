@@ -1,0 +1,9 @@
+# 构建镜像时忽略本地测试与缓存，避免把无关文件带入镜像上下文。
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.ruff_cache/
+**/tests/
+scripts/
+.git/
+README.md

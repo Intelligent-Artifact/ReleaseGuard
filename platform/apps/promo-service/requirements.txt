@@ -1,0 +1,3 @@
+# promo-service 运行依赖，版本固定以保证干净环境可复现。
+Flask==2.2.2
+prometheus-client==0.14.1
