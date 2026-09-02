@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "releaseguard-agent"
+version = "0.1.0"
+description = "ReleaseGuard Agent：CP0 契约冒烟测试基线（领域模型 + 确定性 mock 调查）"
+readme = "README.md"
+requires-python = ">=3.11"
+# CP0 保持轻量：契约冒烟测试只依赖 pydantic，不引入 langgraph / langchain。
+dependencies = [
+  "pydantic>=2.10,<3",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.3,<9"]
+
+[project.scripts]
+releaseguard-smoke = "releaseguard.smoke:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+# 使 tests 无需预先 pip install -e 即可导入 src 下的包。
+pythonpath = ["src"]
