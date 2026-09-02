@@ -1,0 +1,15 @@
+# Default reviewers for repository-wide changes.
+* @Manticore0918 @adminxue
+
+# Primary ownership boundaries.
+/agent/ @Manticore0918
+/platform/ @adminxue
+
+# Shared contracts and integration surfaces require both owners.
+/contracts/ @Manticore0918 @adminxue
+/scenarios/ @Manticore0918 @adminxue
+/tests/e2e/ @Manticore0918 @adminxue
+/docs/ @Manticore0918 @adminxue
+/.github/ @Manticore0918 @adminxue
+/README.md @Manticore0918 @adminxue
+/CONTRIBUTING.md @Manticore0918 @adminxue

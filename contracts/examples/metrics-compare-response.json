@@ -1,0 +1,31 @@
+{
+  "request_id": "req_metrics_001",
+  "generated_at": "2026-09-02T14:36:30Z",
+  "environment": "demo",
+  "service": "payment-service",
+  "baseline": "v1",
+  "candidate": "v2",
+  "window": "5m",
+  "metrics": [
+    {
+      "name": "p95_latency",
+      "unit": "ms",
+      "baseline_value": 121,
+      "candidate_value": 493,
+      "sample_count": 840,
+      "comparable": true
+    },
+    {
+      "name": "error_rate",
+      "unit": "ratio",
+      "baseline_value": 0.004,
+      "candidate_value": 0.007,
+      "sample_count": 840,
+      "comparable": true
+    }
+  ],
+  "warnings": [],
+  "source_refs": [
+    "prometheus:query/release-comparison-001"
+  ]
+}

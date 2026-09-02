@@ -1,0 +1,53 @@
+name: Feature
+description: Propose an Agent, platform, contract, scenario, or integration feature.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Agent
+        - Platform
+        - Contract
+        - Incident scenario
+        - End-to-end integration
+        - Documentation
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Owner
+      placeholder: "@Manticore0918, @adminxue, or both"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What engineering problem or user outcome does this address?
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Contract and dependencies
+      description: List API fields, schemas, providers, consumers, and blocking work.
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - [ ] Observable result
+        - [ ] Failure behavior
+        - [ ] Required tests
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety, rollback, and cleanup
+      description: Describe permissions, blast radius, rollback, and cleanup requirements.

@@ -1,0 +1,26 @@
+{
+  "request_id": "req_deploy_001",
+  "generated_at": "2026-09-02T14:36:00Z",
+  "environment": "demo",
+  "service": "payment-service",
+  "current": {
+    "version": "v2",
+    "image_digest": "sha256:candidate-example",
+    "commit_sha": "8fa17bc",
+    "deployed_at": "2026-09-02T14:32:00Z"
+  },
+  "previous": {
+    "version": "v1",
+    "image_digest": "sha256:baseline-example",
+    "commit_sha": "73bd9a1",
+    "deployed_at": "2026-09-01T10:00:00Z"
+  },
+  "rollout": {
+    "status": "PROGRESSING",
+    "candidate_weight": 10
+  },
+  "warnings": [],
+  "source_refs": [
+    "argo:rollout/payment-service:revision-12"
+  ]
+}

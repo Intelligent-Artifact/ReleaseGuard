@@ -1,0 +1,46 @@
+name: Bug
+description: Report reproducible incorrect behavior.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Agent
+        - Platform
+        - Contract
+        - Incident scenario
+        - End-to-end integration
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Add safe logs, request IDs, action IDs, screenshots, or test output. Remove secrets.
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact and safety
+      description: Describe affected environments, blast radius, and whether cleanup is required.

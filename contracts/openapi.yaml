@@ -1,0 +1,395 @@
+openapi: 3.1.0
+info:
+  title: ReleaseGuard Ops Gateway API
+  version: 0.1.0
+  description: >-
+    Versioned and constrained operations API used by the ReleaseGuard Agent.
+    Arbitrary shell, kubectl, PromQL, and LogQL execution is intentionally excluded.
+servers:
+  - url: http://localhost:8081
+    description: Local development
+tags:
+  - name: Deployments
+  - name: Telemetry
+  - name: Actions
+paths:
+  /api/v1/deployments/{service}:
+    get:
+      tags: [Deployments]
+      operationId: getDeployment
+      summary: Get current deployment and rollout metadata
+      parameters:
+        - $ref: '#/components/parameters/ServicePath'
+        - $ref: '#/components/parameters/EnvironmentQuery'
+      responses:
+        '200':
+          description: Deployment metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/InvalidArgument'
+  /api/v1/metrics/compare:
+    get:
+      tags: [Telemetry]
+      operationId: compareMetrics
+      summary: Compare a baseline and candidate using bounded metric templates
+      parameters:
+        - $ref: '#/components/parameters/ServiceQuery'
+        - $ref: '#/components/parameters/EnvironmentQuery'
+        - name: baseline
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: candidate
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: window
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [1m, 5m, 10m, 15m]
+            default: 5m
+      responses:
+        '200':
+          description: Comparable release metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsCompareResponse'
+        '422':
+          $ref: '#/components/responses/InvalidArgument'
+        '503':
+          $ref: '#/components/responses/TelemetryUnavailable'
+  /api/v1/actions/rollback:
+    post:
+      tags: [Actions]
+      operationId: submitRollback
+      summary: Submit an approved and explicit release rollback
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RollbackRequest'
+      responses:
+        '202':
+          description: Action accepted for asynchronous execution
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionResponse'
+        '403':
+          $ref: '#/components/responses/PolicyDenied'
+        '409':
+          $ref: '#/components/responses/ActionConflict'
+        '422':
+          $ref: '#/components/responses/InvalidArgument'
+  /api/v1/actions/{action_id}:
+    get:
+      tags: [Actions]
+      operationId: getAction
+      summary: Get action execution and verification status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: action_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Action status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: short-lived service token
+  parameters:
+    ServicePath:
+      name: service
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[a-z][a-z0-9-]{1,62}$'
+    ServiceQuery:
+      name: service
+      in: query
+      required: true
+      schema:
+        type: string
+        pattern: '^[a-z][a-z0-9-]{1,62}$'
+    EnvironmentQuery:
+      name: environment
+      in: query
+      required: true
+      schema:
+        type: string
+        enum: [demo, staging]
+  schemas:
+    DeploymentResponse:
+      type: object
+      additionalProperties: false
+      required: [request_id, generated_at, environment, service, current, rollout, warnings, source_refs]
+      properties:
+        request_id:
+          type: string
+        generated_at:
+          type: string
+          format: date-time
+        environment:
+          type: string
+        service:
+          type: string
+        current:
+          $ref: '#/components/schemas/ReleaseRevision'
+        previous:
+          oneOf:
+            - $ref: '#/components/schemas/ReleaseRevision'
+            - type: 'null'
+        rollout:
+          type: object
+          additionalProperties: false
+          required: [status, candidate_weight]
+          properties:
+            status:
+              type: string
+              enum: [STABLE, PROGRESSING, PAUSED, DEGRADED, ABORTED]
+            candidate_weight:
+              type: integer
+              minimum: 0
+              maximum: 100
+        warnings:
+          type: array
+          items:
+            type: string
+        source_refs:
+          type: array
+          items:
+            type: string
+    ReleaseRevision:
+      type: object
+      additionalProperties: false
+      required: [version, image_digest, commit_sha, deployed_at]
+      properties:
+        version:
+          type: string
+        image_digest:
+          type: string
+        commit_sha:
+          type: string
+        deployed_at:
+          type: string
+          format: date-time
+    MetricsCompareResponse:
+      type: object
+      additionalProperties: false
+      required: [request_id, generated_at, environment, service, baseline, candidate, window, metrics, warnings, source_refs]
+      properties:
+        request_id:
+          type: string
+        generated_at:
+          type: string
+          format: date-time
+        environment:
+          type: string
+        service:
+          type: string
+        baseline:
+          type: string
+        candidate:
+          type: string
+        window:
+          type: string
+        metrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/MetricComparison'
+        warnings:
+          type: array
+          items:
+            type: string
+        source_refs:
+          type: array
+          items:
+            type: string
+    MetricComparison:
+      type: object
+      additionalProperties: false
+      required: [name, unit, baseline_value, candidate_value, sample_count, comparable]
+      properties:
+        name:
+          type: string
+          enum: [request_rate, error_rate, p95_latency, availability]
+        unit:
+          type: string
+        baseline_value:
+          type: number
+        candidate_value:
+          type: number
+        sample_count:
+          type: integer
+          minimum: 0
+        comparable:
+          type: boolean
+    RollbackRequest:
+      type: object
+      additionalProperties: false
+      required: [proposal_id, investigation_id, environment, service, from_version, to_version, risk, approval]
+      properties:
+        proposal_id:
+          type: string
+        investigation_id:
+          type: string
+        environment:
+          type: string
+          enum: [demo, staging]
+        service:
+          type: string
+        from_version:
+          type: string
+        to_version:
+          type: string
+        risk:
+          type: string
+          enum: [MEDIUM]
+        approval:
+          $ref: '#/components/schemas/Approval'
+    Approval:
+      type: object
+      additionalProperties: false
+      required: [token, approved_by, approved_at, expires_at]
+      properties:
+        token:
+          type: string
+        approved_by:
+          type: string
+        approved_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+    ActionResponse:
+      type: object
+      additionalProperties: false
+      required: [request_id, action_id, proposal_id, status, target, steps, audit_ref, updated_at]
+      properties:
+        request_id:
+          type: string
+        action_id:
+          type: string
+        proposal_id:
+          type: string
+        status:
+          type: string
+          enum: [ACCEPTED, RUNNING, VERIFYING, SUCCEEDED, FAILED, VERIFICATION_FAILED]
+        target:
+          type: object
+          additionalProperties: false
+          required: [environment, service, from_version, to_version]
+          properties:
+            environment:
+              type: string
+            service:
+              type: string
+            from_version:
+              type: string
+            to_version:
+              type: string
+        steps:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [name, status]
+            properties:
+              name:
+                type: string
+              status:
+                type: string
+                enum: [PENDING, RUNNING, SUCCEEDED, FAILED]
+        audit_ref:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [request_id, code, message]
+      properties:
+        request_id:
+          type: string
+        code:
+          type: string
+          enum:
+            - INVALID_ARGUMENT
+            - NOT_FOUND
+            - TARGET_NOT_ALLOWLISTED
+            - POLICY_DENIED
+            - APPROVAL_REQUIRED
+            - APPROVAL_EXPIRED
+            - ACTION_ALREADY_RUNNING
+            - TELEMETRY_UNAVAILABLE
+            - EXECUTION_FAILED
+            - VERIFICATION_FAILED
+        message:
+          type: string
+  responses:
+    InvalidArgument:
+      description: Invalid or unsupported request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: The requested resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    PolicyDenied:
+      description: The requested operation is denied by policy or approval rules
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ActionConflict:
+      description: A conflicting action is already running or the idempotency key conflicts
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TelemetryUnavailable:
+      description: Required telemetry is unavailable or stale
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
