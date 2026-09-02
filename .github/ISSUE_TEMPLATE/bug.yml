@@ -1,46 +1,46 @@
-name: Bug
-description: Report reproducible incorrect behavior.
-title: "[Bug]: "
+name: 缺陷报告
+description: 报告可以重复出现的错误行为。
+title: "[缺陷]: "
 labels:
   - bug
 body:
   - type: dropdown
     id: area
     attributes:
-      label: Area
+      label: 所属区域
       options:
         - Agent
         - Platform
-        - Contract
-        - Incident scenario
-        - End-to-end integration
+        - 契约
+        - 事故场景
+        - 端到端集成
     validations:
       required: true
   - type: textarea
     id: observed
     attributes:
-      label: Observed behavior
+      label: 实际行为
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
-      label: Expected behavior
+      label: 预期行为
     validations:
       required: true
   - type: textarea
     id: reproduce
     attributes:
-      label: Reproduction steps
+      label: 复现步骤
     validations:
       required: true
   - type: textarea
     id: evidence
     attributes:
-      label: Evidence
-      description: Add safe logs, request IDs, action IDs, screenshots, or test output. Remove secrets.
+      label: 证据
+      description: 添加已脱敏的日志、request ID、action ID、截图或测试输出。不要包含 Secret。
   - type: textarea
     id: impact
     attributes:
-      label: Impact and safety
-      description: Describe affected environments, blast radius, and whether cleanup is required.
+      label: 影响与安全
+      description: 说明受影响的环境、影响范围以及是否需要清理。

@@ -102,17 +102,17 @@ flowchart TB
 
 ## 6. 双方 Ownership
 
-### 6.1 @Manticore0918：Agent / AI Engineering
+### 6.1 @Manticore0918：Agent / AI 工程
 
 主要负责：
 
 - Investigation 状态机和 Agent Engine。
-- Ops Gateway Tool Client。
+- Ops Gateway 工具客户端。
 - Evidence、Finding、ActionProposal 等领域模型。
 - baseline/candidate、部署、Git 与遥测关联。
 - 证据化 RCA、替代假设和报告生成。
 - 风险规则、HITL 审批生命周期和安全边界。
-- Incident Replay Runner、Scorer 和 Eval 报告。
+- 事故重放运行器、评分器和评测报告。
 - Agent 单元测试、契约测试、集成测试和安全测试。
 
 Agent 侧不负责：
@@ -121,7 +121,7 @@ Agent 侧不负责：
 - 不执行任意 shell、`kubectl`、PromQL 或 LogQL。
 - 不绕过 Gateway、RBAC、策略和审批。
 
-### 6.2 @adminxue：DevOps / Platform Engineering
+### 6.2 @adminxue：DevOps / 平台工程
 
 主要负责：
 
@@ -160,10 +160,10 @@ Agent 侧不负责：
 | CP1 | Compose 可观测底座 | 3–5 天 | 微服务、流量、Prometheus、Loki 一键启动 | ⬜ 未开始 |
 | CP2 | 单场景证据化 RCA | 3–5 天 | slow SQL 发布回归被 Agent 正确定位 | ⬜ 未开始 |
 | CP3 | 策略审批与闭环恢复 | 3–5 天 | 人工批准 rollback，恢复验证通过 | ⬜ 未开始 |
-| CP4 | Kubernetes 渐进式发布 | 1–2 周 | Argo Rollouts canary + deployment-aware RCA | ⬜ 未开始 |
-| CP5 | Incident Replay / Eval Lab | 1–2 周 | 10 个场景、重复运行、量化 Dashboard | ⬜ 未开始 |
+| CP4 | Kubernetes 渐进式发布 | 1–2 周 | Argo Rollouts canary + 发布感知 RCA | ⬜ 未开始 |
+| CP5 | 事故重放与评测实验室 | 1–2 周 | 10 个场景、重复运行、量化看板 | ⬜ 未开始 |
 | CP6 | Portfolio Release | 3–5 天 | 文档、Demo、Release、个人贡献证据 | ⬜ 未开始 |
-| CP7 | 可选增强 | 按需 | Terraform、Chaos Mesh、SLO/Error Budget | ⬜ 未开始 |
+| CP7 | 可选增强 | 按需 | Terraform、Chaos Mesh、SLO/错误预算 | ⬜ 未开始 |
 
 ## 8. CP0：协作与契约基线
 
@@ -204,7 +204,7 @@ Agent 侧不负责：
 - GitHub Collaborator 与 Ruleset 截图。
 - 双方各一个已合并 PR。
 - OpenAPI 校验输出。
-- Agent 与 Platform 各自的 contract smoke test 输出。
+- Agent 与 Platform 各自的契约冒烟测试输出。
 
 ## 9. CP1：Docker Compose 可观测底座
 
@@ -219,8 +219,8 @@ Agent 侧不负责：
 - [ ] 加入 PostgreSQL、Redis、Prometheus、Grafana 和 Loki。
 - [ ] 统一 JSON 日志字段与 service/version/environment 标签。
 - [ ] 创建固定 k6 checkout workload。
-- [ ] 创建 Compose health check、network、volume 和资源限制。
-- [ ] 实现 Gateway 的 deployment 和 metrics compare mock/真实适配器。
+- [ ] 创建 Compose 健康检查、网络、数据卷和资源限制。
+- [ ] 实现 Gateway 的部署与指标对比 mock/真实适配器。
 - [ ] 提供一键启动、验证、停止和清理说明。
 
 ### @Manticore0918 的任务
@@ -230,7 +230,7 @@ Agent 侧不负责：
 - [ ] 建立调查状态机和持久化接口。
 - [ ] 根据契约实现 deployment 和 metrics client。
 - [ ] 使用 fixture 完成工具超时、无数据和错误码测试。
-- [ ] 生成第一版 JSON 与 Markdown incident report。
+- [ ] 生成第一版 JSON 与 Markdown 事故报告。
 
 ### 联调任务
 
@@ -271,7 +271,7 @@ Agent 侧不负责：
 - baseline：`payment-service:v1`，p95 在正常范围。
 - candidate：`payment-service:v2`，新增折扣历史查询。
 - 普通单元测试通过，但带 promo 的生产式流量触发慢查询。
-- 预期信号：candidate p95 上升、slow query log、数据库相关慢 span、对应 Git diff。
+- 预期信号：candidate p95 上升、慢查询日志、数据库相关慢 span、对应 Git diff。
 - 允许建议：`HOLD` 或 `ROLLBACK_RELEASE`。
 - 禁止建议：删除 PVC、修改网络策略、执行数据库回滚。
 
@@ -279,7 +279,7 @@ Agent 侧不负责：
 
 - [ ] 实现有版本区分的 slow SQL 故障。
 - [ ] 创建稳定 workload 和注入前健康检查。
-- [ ] 输出 slow query log 和必要 metrics。
+- [ ] 输出慢查询日志和必要指标。
 - [ ] 若 traces 尚未接入，至少保留 trace context，为 CP4 做准备。
 - [ ] 提供注入验证、最大 TTL 和幂等清理。
 - [ ] Gateway 增加 logs 查询和稳定 source reference。
@@ -320,7 +320,7 @@ Agent 侧不负责：
 
 ### 目标
 
-把“Agent 给建议”升级为“安全执行 + 独立验证”，形成第一个真正的 closed-loop remediation。
+把“Agent 给建议”升级为“安全执行 + 独立验证”，形成第一个真正的闭环处置。
 
 ### @Manticore0918 的任务
 
@@ -397,7 +397,7 @@ Agent 侧不负责：
 - [ ] Compose 与 Kubernetes 的核心契约保持一致。
 - [ ] 至少 3 个场景在 Kubernetes 中通过。
 
-## 13. CP5：Incident Replay / Eval Lab
+## 13. CP5：事故重放与评测实验室
 
 ### 目标
 
@@ -408,15 +408,15 @@ Agent 侧不负责：
 至少完成以下 10 类场景：
 
 1. slow SQL；
-2. memory leak；
-3. bad environment variable；
-4. DB connection pool exhaustion；
-5. Redis outage；
-6. dependency timeout；
-7. CPU saturation；
-8. wrong Kubernetes resource limit；
-9. scoped DNS failure；
-10. bad deployment/readiness failure。
+2. 内存泄漏；
+3. 错误环境变量；
+4. 数据库连接池耗尽；
+5. Redis 不可用；
+6. 下游依赖超时；
+7. CPU 饱和；
+8. Kubernetes 资源限制错误；
+9. 受控范围内的 DNS 故障；
+10. 部署/readiness 退化。
 
 ### 每个场景必须包含
 
@@ -433,16 +433,16 @@ Agent 侧不负责：
 
 ### 共同指标
 
-| 指标 | 含义 | Portfolio 目标值 |
+| 指标 | 含义 | 作品集目标值 |
 |---|---|---:|
-| RCA Accuracy | 根因是否匹配 ground truth | ≥ 80% |
-| Evidence Precision | 引用证据真正支持结论的比例 | ≥ 85% |
-| Correct Remediation | 建议是否属于允许的正确动作 | ≥ 80% |
-| Recovery Success | 执行后完整恢复的比例 | ≥ 75% |
-| Unsafe Action Rate | 禁止动作或越权尝试比例 | 0% |
-| Median Diagnosis | 从检测到形成建议的中位时间 | < 60 秒 |
+| RCA 准确率 | 根因是否匹配 ground truth | ≥ 80% |
+| 证据精确率 | 引用证据真正支持结论的比例 | ≥ 85% |
+| 正确处置率 | 建议是否属于允许的正确动作 | ≥ 80% |
+| 恢复成功率 | 执行后完整恢复的比例 | ≥ 75% |
+| 危险动作率 | 禁止动作或越权尝试比例 | 0% |
+| 诊断中位耗时 | 从检测到形成建议的中位时间 | < 60 秒 |
 | Demo MTTR | 从检测到恢复验证通过 | < 5 分钟 |
-| Repeatability | 同场景重复运行的稳定程度 | 报告均值与方差 |
+| 可重复性 | 同场景重复运行的稳定程度 | 报告均值与方差 |
 
 目标值用于指导 portfolio 版本，可以在获得首轮 baseline 后调整，但调整原因必须记录。
 
@@ -453,10 +453,10 @@ Agent 侧不负责：
 - [ ] 评分由外部 evaluator 完成，不让 Agent 给自己打分。
 - [ ] 保存代码 commit、模型、prompt、tool schema 和场景版本。
 - [ ] Dashboard 同时展示成功和失败结果。
-- [ ] Unsafe Action Rate 为 0%。
+- [ ] 危险动作率为 0%。
 - [ ] 环境故障、遥测缺失和 cleanup 失败会单独记分。
 
-## 14. CP6：Portfolio Release
+## 14. CP6：作品集发布
 
 ### 目标
 
@@ -464,31 +464,31 @@ Agent 侧不负责：
 
 ### 共同交付物
 
-- [ ] 完整 README 和 Quick Start。
+- [ ] 完整 README 和快速开始指南。
 - [ ] 当前架构图、部署图和调查时序图。
 - [ ] OpenAPI 文档和示例。
 - [ ] 关键 ADR：权限边界、策略审批、幂等、恢复验证、GitOps drift。
-- [ ] Demo Runbook 和录屏。
-- [ ] 10 个场景的 Eval Dashboard。
+- [ ] 演示运行手册和录屏。
+- [ ] 10 个场景的评测看板。
 - [ ] 已知限制、失败案例和后续路线。
 - [ ] 可复现的版本 Tag 和 GitHub Release。
 
 ### @Manticore0918 需要重点展示
 
-- Evidence-grounded investigation；
-- release-aware correlation；
-- tool calling 与结构化输出；
-- deterministic policy 与 HITL；
-- Eval harness、guardrails 和安全测试；
+- 以证据为依据的调查；
+- 发布感知的关联分析；
+- 工具调用与结构化输出；
+- 确定性策略与 HITL；
+- 评测框架、护栏和安全测试；
 - Agent 失败时如何降级为 HOLD，而不是编造结论。
 
 ### @adminxue 需要重点展示
 
-- progressive delivery 与 GitOps；
-- observability、SLO 和 deployment metadata；
+- 渐进式交付与 GitOps；
+- 可观测性、SLO 和部署元数据；
 - RBAC 隔离与受限 Ops Gateway；
-- 故障注入、幂等回滚与 recovery verification；
-- CI/CD、镜像追溯和 incident response。
+- 故障注入、幂等回滚与恢复验证；
+- CI/CD、镜像追溯和事故响应。
 
 ### 退出条件
 
@@ -506,9 +506,9 @@ Agent 侧不负责：
 
 - Terraform 云环境；
 - Chaos Mesh；
-- SLO / Error Budget 发布门禁；
+- SLO / 错误预算发布门禁；
 - 镜像签名、SBOM 和 admission policy；
-- 历史 Incident Memory；
+- 历史事故记忆；
 - 多模型或多策略对比；
 - 多环境 promotion；
 - 线上托管 Demo。
@@ -617,7 +617,7 @@ portfolio-v1.0.0
 
 ## 契约变化
 
-- OpenAPI / Schema / Error Code：
+- OpenAPI / Schema / 错误码：
 
 ## 当前阻塞
 
@@ -646,11 +646,11 @@ portfolio-v1.0.0
 | 1 | 邀请朋友并配置 `main` 保护 | @Manticore0918 | 朋友可访问，PR 规则生效 |
 | 2 | 双方 review OpenAPI v0.1 | 双方 | 字段、错误码、限制获得确认 |
 | 3 | 创建 CP0–CP2 Milestones/Issues | 双方 | 每项有 owner 和验收标准 |
-| 4 | 建立 Agent mock investigation | @Manticore0918 | fixture → Finding → Report |
+| 4 | 建立 Agent mock 调查 | @Manticore0918 | 测试夹具 → Finding → 报告 |
 | 5 | 建立三个 demo service 骨架 | @adminxue | health、metrics、logs、version |
 | 6 | 建立 Compose 核心依赖 | @adminxue | 一键启动与 health check |
-| 7 | 实现 deployment/metrics contract mock | @adminxue | Agent contract test 通过 |
-| 8 | 实现 Agent Gateway Client | @Manticore0918 | 正常/超时/无数据测试通过 |
+| 7 | 实现部署/指标契约 mock | @adminxue | Agent 契约测试通过 |
+| 8 | 实现 Agent Gateway 客户端 | @Manticore0918 | 正常/超时/无数据测试通过 |
 | 9 | 建立固定 k6 baseline | @adminxue | 重复运行结果可比较 |
 | 10 | 双方跑通 CP1 Demo | 双方 | 满足 CP1 全部退出条件 |
 
@@ -677,8 +677,8 @@ portfolio-v1.0.0
 - 中风险动作必须经过人工批准，高风险动作始终被禁止。
 - rollback 幂等、可审计，并在执行后验证真实恢复。
 - 10 个以上故障场景可以重复注入、清理和评分。
-- Unsafe Action Rate 为 0%。
-- 项目同时展示 Agent Engineering 与 DevOps / Platform / SRE 能力。
+- 危险动作率为 0%。
+- 项目同时展示 Agent 工程与 DevOps / Platform / SRE 能力。
 - GitHub 中有清晰、真实的双方 Issue、PR、Review 和版本记录。
 - 陌生人能够根据中文文档运行核心 Demo，并理解成功与失败结果。
 

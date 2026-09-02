@@ -1,29 +1,29 @@
 openapi: 3.1.0
 info:
-  title: ReleaseGuard Ops Gateway API
+  title: ReleaseGuard 运维网关 API
   version: 0.1.0
   description: >-
-    Versioned and constrained operations API used by the ReleaseGuard Agent.
-    Arbitrary shell, kubectl, PromQL, and LogQL execution is intentionally excluded.
+    ReleaseGuard Agent 使用的版本化、受约束运维 API。
+    本接口明确禁止执行任意 shell、kubectl、PromQL 和 LogQL。
 servers:
   - url: http://localhost:8081
-    description: Local development
+    description: 本地开发环境
 tags:
-  - name: Deployments
-  - name: Telemetry
-  - name: Actions
+  - name: 部署
+  - name: 遥测
+  - name: 动作
 paths:
   /api/v1/deployments/{service}:
     get:
-      tags: [Deployments]
+      tags: [部署]
       operationId: getDeployment
-      summary: Get current deployment and rollout metadata
+      summary: 获取当前部署和 rollout 元数据
       parameters:
         - $ref: '#/components/parameters/ServicePath'
         - $ref: '#/components/parameters/EnvironmentQuery'
       responses:
         '200':
-          description: Deployment metadata
+          description: 部署元数据
           content:
             application/json:
               schema:
@@ -34,9 +34,9 @@ paths:
           $ref: '#/components/responses/InvalidArgument'
   /api/v1/metrics/compare:
     get:
-      tags: [Telemetry]
+      tags: [遥测]
       operationId: compareMetrics
-      summary: Compare a baseline and candidate using bounded metric templates
+      summary: 使用受限指标模板比较 baseline 与 candidate
       parameters:
         - $ref: '#/components/parameters/ServiceQuery'
         - $ref: '#/components/parameters/EnvironmentQuery'
@@ -59,7 +59,7 @@ paths:
             default: 5m
       responses:
         '200':
-          description: Comparable release metrics
+          description: 可比较的发布指标
           content:
             application/json:
               schema:
@@ -70,9 +70,9 @@ paths:
           $ref: '#/components/responses/TelemetryUnavailable'
   /api/v1/actions/rollback:
     post:
-      tags: [Actions]
+      tags: [动作]
       operationId: submitRollback
-      summary: Submit an approved and explicit release rollback
+      summary: 提交已批准且目标明确的发布回滚
       security:
         - bearerAuth: []
       parameters:
@@ -91,7 +91,7 @@ paths:
               $ref: '#/components/schemas/RollbackRequest'
       responses:
         '202':
-          description: Action accepted for asynchronous execution
+          description: 动作已进入异步执行队列
           content:
             application/json:
               schema:
@@ -104,9 +104,9 @@ paths:
           $ref: '#/components/responses/InvalidArgument'
   /api/v1/actions/{action_id}:
     get:
-      tags: [Actions]
+      tags: [动作]
       operationId: getAction
-      summary: Get action execution and verification status
+      summary: 获取动作执行和验证状态
       security:
         - bearerAuth: []
       parameters:
@@ -117,7 +117,7 @@ paths:
             type: string
       responses:
         '200':
-          description: Action status
+          description: 动作状态
           content:
             application/json:
               schema:
@@ -129,7 +129,7 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
-      bearerFormat: short-lived service token
+      bearerFormat: 短时效服务令牌
   parameters:
     ServicePath:
       name: service
@@ -364,31 +364,31 @@ components:
           type: string
   responses:
     InvalidArgument:
-      description: Invalid or unsupported request parameters
+      description: 请求参数无效或不受支持
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     NotFound:
-      description: The requested resource was not found
+      description: 未找到请求的资源
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     PolicyDenied:
-      description: The requested operation is denied by policy or approval rules
+      description: 请求的操作被策略或审批规则拒绝
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     ActionConflict:
-      description: A conflicting action is already running or the idempotency key conflicts
+      description: 已有冲突动作正在运行，或幂等键发生冲突
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     TelemetryUnavailable:
-      description: Required telemetry is unavailable or stale
+      description: 所需遥测不可用或已经过期
       content:
         application/json:
           schema:

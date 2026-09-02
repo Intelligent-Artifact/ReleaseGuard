@@ -1,11 +1,11 @@
-# Default reviewers for repository-wide changes.
+# 仓库级变更的默认 Review 人。
 * @Manticore0918 @adminxue
 
-# Primary ownership boundaries.
+# 主要职责边界。
 /agent/ @Manticore0918
 /platform/ @adminxue
 
-# Shared contracts and integration surfaces require both owners.
+# 共享契约和集成边界需要双方共同负责。
 /contracts/ @Manticore0918 @adminxue
 /scenarios/ @Manticore0918 @adminxue
 /tests/e2e/ @Manticore0918 @adminxue

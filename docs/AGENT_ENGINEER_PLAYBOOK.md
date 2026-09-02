@@ -1,6 +1,6 @@
 # ReleaseGuard：Agent / AI 工程负责人执行手册
 
-> 适用角色：你（Agent / AI Engineer）<br>
+> 适用角色：你（Agent / AI 工程师）<br>
 > 配套文档：[DEVOPS_PLATFORM_PLAYBOOK.md](./DEVOPS_PLATFORM_PLAYBOOK.md)<br>
 > 项目目标：构建一个能够识别发布回归、关联变更与遥测证据、提出受策略约束的处置建议，并在执行后验证恢复结果的平台。
 
@@ -68,7 +68,7 @@ flowchart LR
     A --> F["Policy + HITL\n你定义流程，Gateway 强制执行"]
     F -->|"批准令牌 / 决策"| B
     B -->|"恢复验证数据"| A
-    A --> G["Incident Report + Eval Result"]
+    A --> G["事故报告 + 评测结果"]
 ```
 
 必须坚持以下边界：
@@ -127,7 +127,7 @@ agent/
 
 ## 5. 核心领域模型
 
-### 5.1 Investigation
+### 5.1 调查（Investigation）
 
 一次调查必须至少包含：
 
@@ -140,12 +140,12 @@ agent/
   "candidate_version": "v2",
   "deployment_id": "deploy_abc123",
   "started_at": "2026-09-02T14:32:00Z",
-  "symptom": "p95 latency SLO violation",
+  "symptom": "p95 延迟违反 SLO",
   "status": "COLLECTING"
 }
 ```
 
-### 5.2 Evidence
+### 5.2 证据（Evidence）
 
 所有工具返回值都应转换为统一 Evidence，而不是直接把整段原始文本塞给模型。
 
@@ -157,7 +157,7 @@ agent/
   "service": "payment-service",
   "version": "v2",
   "observed_at": "2026-09-02T14:35:00Z",
-  "summary": "v2 p95 latency is 493 ms; v1 is 121 ms",
+  "summary": "v2 的 p95 延迟为 493 ms，v1 为 121 ms",
   "value": 493,
   "unit": "ms",
   "query_ref": "query_91a8",
@@ -170,11 +170,11 @@ agent/
 }
 ```
 
-### 5.3 RootCauseFinding
+### 5.3 根因结论（RootCauseFinding）
 
 ```json
 {
-  "root_cause": "A new synchronous discount-history query increases checkout latency",
+  "root_cause": "新增的同步折扣历史查询导致结账延迟上升",
   "affected_service": "payment-service",
   "confidence": 0.94,
   "evidence_ids": [
@@ -185,7 +185,7 @@ agent/
   ],
   "alternative_hypotheses": [
     {
-      "hypothesis": "PostgreSQL saturation unrelated to release",
+      "hypothesis": "与本次发布无关的 PostgreSQL 饱和",
       "confidence": 0.12,
       "rejected_by": ["metric:db_cpu:normal:992"]
     }
@@ -193,7 +193,7 @@ agent/
 }
 ```
 
-### 5.4 ActionProposal
+### 5.4 动作建议（ActionProposal）
 
 ```json
 {
@@ -206,7 +206,7 @@ agent/
     "from_version": "v2",
     "to_version": "v1"
   },
-  "reason": "Canary-only SLO regression correlates with commit 8fa17bc",
+  "reason": "仅 canary 出现的 SLO 回归与 commit 8fa17bc 相关",
   "evidence_ids": [
     "metric:payment_p95:v2:1732",
     "trace:checkout:abc123",
@@ -376,8 +376,8 @@ V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
   "status": "INCONCLUSIVE",
   "missing_evidence": ["candidate traces"],
   "conflicts": [
-    "metrics show canary-only regression",
-    "logs show database latency across both versions"
+    "指标显示仅 canary 出现回归",
+    "日志显示两个版本都存在数据库延迟"
   ],
   "safe_recommendation": "HOLD"
 }
@@ -405,7 +405,7 @@ V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 
 项目设计原则可以概括为：AI 提议，策略裁决，高风险由人批准，基础设施独立验证。
 
-## 12. Incident Replay / Eval Lab
+## 12. 事故重放与评测实验室
 
 这是你最需要做出差异化的部分。
 
@@ -427,16 +427,16 @@ V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 
 | 指标 | 建议定义 |
 |---|---|
-| RCA Accuracy | 预测根因是否匹配 ground truth，可按 service、fault type、mechanism 分层评分 |
-| Evidence Precision | 被引用证据中有多少真正支持结论 |
-| Evidence Recall | ground truth 指定的关键证据有多少被找到 |
-| Correct Remediation | 推荐动作是否属于允许的正确动作集合 |
-| Recovery Success | 执行后健康、SLO 和 rollout 是否全部恢复 |
-| Unsafe Action Rate | 触发禁止动作或尝试绕过策略的比例，目标必须为 0 |
-| Diagnosis Latency | 从告警到形成可执行建议的时间 |
+| RCA 准确率 | 预测根因是否匹配 ground truth，可按 service、故障类型和机制分层评分 |
+| 证据精确率 | 被引用证据中有多少真正支持结论 |
+| 证据召回率 | ground truth 指定的关键证据有多少被找到 |
+| 正确处置率 | 推荐动作是否属于允许的正确动作集合 |
+| 恢复成功率 | 执行后健康、SLO 和 rollout 是否全部恢复 |
+| 危险动作率 | 触发禁止动作或尝试绕过策略的比例，目标必须为 0 |
+| 诊断耗时 | 从告警到形成可执行建议的时间 |
 | MTTR | 从告警到恢复验证通过的时间 |
-| Tool Efficiency | 工具调用次数、失败率和冗余调用比例 |
-| Cost | 每次调查 token 与模型成本 |
+| 工具效率 | 工具调用次数、失败率和冗余调用比例 |
+| 成本 | 每次调查的 token 与模型成本 |
 
 ### 12.3 防止“评测作弊”
 
@@ -463,7 +463,7 @@ V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 
 - 用 OpenAPI 或 JSON Schema 固定请求/响应。
 - Agent CI 使用朋友提供的 Gateway mock。
-- Platform CI 使用你提供的 Agent consumer fixtures。
+- 平台 CI 使用你提供的 Agent 消费方测试夹具。
 - 对新增必填字段、枚举删除和语义变化做 breaking-change 检查。
 
 ### 13.3 集成测试
@@ -485,7 +485,7 @@ V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 
 ## 14. 分阶段交付计划
 
-### Phase 0：契约和骨架（0.5–1 天）
+### 阶段 0：契约和骨架（0.5–1 天）
 
 - [ ] 与朋友确认公共命名、版本标签、时间格式和错误码。
 - [ ] 写出 OpenAPI 初稿和示例 fixture。
@@ -494,7 +494,7 @@ V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 
 完成标准：Agent 在没有真实基础设施时，也能基于 fixture 跑完一次模拟调查并生成报告。
 
-### Phase 1：Docker Compose MVP（约 1 周）
+### 阶段 1：Docker Compose MVP（约 1 周）
 
 - [ ] 接入部署元数据、Prometheus 和 Loki。
 - [ ] 支持 3 个场景：慢 SQL、内存泄漏、错误环境变量。
@@ -506,10 +506,10 @@ V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 
 完成标准：从注入故障到得到带证据 RCA 的全过程可重复，Agent 不需要直接进入容器或执行 shell。
 
-### Phase 2：Kubernetes 与 Progressive Delivery
+### 阶段 2：Kubernetes 与渐进式交付
 
 - [ ] 接入 Kubernetes events 和 Argo Rollouts 状态。
-- [ ] 支持 deployment-aware RCA。
+- [ ] 支持发布感知 RCA。
 - [ ] 接入 Git diff 和 commit metadata。
 - [ ] 增加 Grafana 展示需要的调查/eval metrics。
 - [ ] 完成实际审批后的 rollback 与恢复验证。
@@ -517,21 +517,21 @@ V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 
 完成标准：canary 出现回归后，能够安全暂停或 rollback，并证明稳定版本恢复 SLO。
 
-### Phase 3：Portfolio 版本
+### 阶段 3：作品集版本
 
 - [ ] 接入 OpenTelemetry traces。
 - [ ] 完成 10 个以上可重复场景。
 - [ ] 输出 RCA、处置、安全、时延和成本 dashboard。
 - [ ] 加入 prompt injection 与越权测试。
-- [ ] 保存完整 reasoning/tool trace 的安全摘要。
+- [ ] 保存完整推理/工具调用轨迹的安全摘要。
 - [ ] 完成架构文档、ADR、演示视频和个人贡献说明。
 
 完成标准：陌生人按照 README 可在本地运行核心 demo，并能看到成功与失败场景，而不是只看到预录结果。
 
-### Phase 4：有余力再做
+### 阶段 4：有余力再做
 
 - 历史 incident memory；
-- SLO / error budget 决策；
+- SLO / 错误预算决策；
 - 多云部署和 Terraform；
 - Chaos Mesh；
 - 多模型或多策略对比；
@@ -541,19 +541,19 @@ V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 
 | 优先级 | Issue | 输出 |
 |---|---|---|
-| P0 | Define Agent–Gateway OpenAPI v1 | OpenAPI、fixtures、错误码 |
-| P0 | Add investigation state machine | 持久化状态、转换测试 |
-| P0 | Define Evidence and Finding schemas | JSON Schema、校验器 |
-| P0 | Implement deployment and metric tools | client、mock、超时处理 |
-| P0 | Implement release correlation | baseline/candidate 比较 |
-| P1 | Add logs investigation tool | 聚合、引用、过滤 |
-| P1 | Add deterministic risk policy | rules、decision、测试 |
-| P1 | Add approval lifecycle | approve/reject/expire/audit |
-| P1 | Generate incident report | JSON + Markdown |
-| P1 | Implement eval runner and scorer | 单场景运行、指标 |
-| P2 | Add traces and Git diff correlation | 多源 RCA |
-| P2 | Publish eval metrics | Grafana/JSON export |
-| P2 | Add prompt-injection safety suite | adversarial fixtures |
+| P0 | 定义 Agent–Gateway OpenAPI v1 | OpenAPI、测试夹具、错误码 |
+| P0 | 增加调查状态机 | 持久化状态、转换测试 |
+| P0 | 定义 Evidence 和 Finding Schema | JSON Schema、校验器 |
+| P0 | 实现部署与指标工具 | 客户端、mock、超时处理 |
+| P0 | 实现发布关联 | baseline/candidate 比较 |
+| P1 | 增加日志调查工具 | 聚合、引用、过滤 |
+| P1 | 增加确定性风险策略 | 规则、决策、测试 |
+| P1 | 增加审批生命周期 | 批准、拒绝、过期、审计 |
+| P1 | 生成事故报告 | JSON + Markdown |
+| P1 | 实现评测运行器和评分器 | 单场景运行、指标 |
+| P2 | 增加链路与 Git diff 关联 | 多源 RCA |
+| P2 | 发布评测指标 | Grafana / JSON 导出 |
+| P2 | 增加提示词注入安全测试集 | 对抗性测试夹具 |
 
 每个 issue 写清楚 owner、依赖、API 输入、验收标准和 demo 方法。
 
@@ -592,7 +592,7 @@ V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 - 下一个端到端场景；
 - eval 结果变化及原因。
 
-## 17. 你的 Definition of Done
+## 17. 你的完成定义
 
 一个 Agent 功能只有同时满足以下条件才算完成：
 
@@ -607,7 +607,7 @@ V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 - [ ] 在至少一个真实场景中通过端到端验证。
 - [ ] 失败路径也被记录并能在 eval 报告中看到。
 
-## 18. Demo 时你要展示什么
+## 18. 演示时你要展示什么
 
 建议把你的演示控制在 6–8 分钟：
 
@@ -625,7 +625,7 @@ V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 ## 19. 明确不做的事
 
 - V1 不做通用聊天界面和复杂前端。
-- V1 不做自由形式的 autonomous shell agent。
+- V1 不做自由形式的自治 shell Agent。
 - 不把“模型自称 94% confidence”当成真实性保证。
 - 不用 RAG 或 memory 掩盖基础工具链和数据质量问题。
 - 不追求几十种工具；先保证 5–8 个工具可靠、可测、可审计。
@@ -637,8 +637,8 @@ V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 
 1. 与朋友用一页 OpenAPI 冻结部署、指标、日志、动作和状态接口。
 2. 建立 Investigation、Evidence、Finding、Proposal 五个核心 schema。
-3. 用静态 fixtures 跑通状态机和 Markdown incident report。
-4. 接入朋友提供的 Compose 环境和 metrics/logs API。
+3. 用静态测试夹具跑通状态机和 Markdown 事故报告。
+4. 接入朋友提供的 Compose 环境和指标/日志 API。
 5. 先完成 slow SQL 单一场景的端到端闭环。
 6. 加入 risk policy 和审批，不等到最后补安全。
 7. 把同一场景重复运行 3 次并记录方差。

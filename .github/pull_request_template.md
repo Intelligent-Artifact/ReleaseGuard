@@ -1,29 +1,29 @@
-## What changed
+## 变更内容
 
-<!-- Describe the problem and the completed outcome. -->
+<!-- 说明要解决的问题和已经完成的结果。 -->
 
-## Ownership and boundaries
+## 职责与边界
 
-- Owner: <!-- @Manticore0918 / @adminxue / both -->
-- Affected paths:
-- Contract changes: <!-- none, backward-compatible, or breaking -->
+- 负责人：<!-- @Manticore0918 / @adminxue / 双方 -->
+- 受影响路径：
+- 契约变更：<!-- 无、向后兼容或破坏兼容 -->
 
-## Verification
+## 验证
 
-<!-- List exact tests, commands, scenarios, or evidence. -->
+<!-- 列出准确的测试、命令、场景或证据。 -->
 
-- [ ] Unit tests
-- [ ] Contract tests
-- [ ] Integration or end-to-end test
-- [ ] Documentation/runbook updated
+- [ ] 单元测试
+- [ ] 契约测试
+- [ ] 集成测试或端到端测试
+- [ ] 文档/运行手册已更新
 
-## Safety and operations
+## 安全与运维
 
-- Risk level: <!-- read-only / low / medium / high -->
-- Required approval or policy changes:
-- Rollback/cleanup procedure:
-- Observability added or changed:
+- 风险等级：<!-- 只读 / 低 / 中 / 高 -->
+- 所需审批或策略变更：
+- 回滚/清理流程：
+- 新增或变更的可观测性：
 
-## Review focus
+## Review 重点
 
-<!-- Tell the reviewer where their attention is most valuable. -->
+<!-- 告诉 Review 者最需要关注的内容。 -->

@@ -1,30 +1,30 @@
 # Platform
 
-Primary owner: [@adminxue](https://github.com/adminxue)
+主要负责人：[@adminxue](https://github.com/adminxue)
 
-This directory will contain the ReleaseGuard runtime and reliability platform:
+本目录用于存放 ReleaseGuard 的运行与可靠性平台，包括：
 
-- demo microservices and stateful dependencies;
-- Docker Compose and Kubernetes deployment;
-- Helm, Argo CD, and Argo Rollouts;
-- Prometheus, Grafana, Loki, and OpenTelemetry;
-- the constrained Ops Gateway;
-- workload generation and fault injection;
-- policy enforcement, RBAC, action audit, and recovery verification.
+- Demo 微服务和有状态依赖；
+- Docker Compose 与 Kubernetes 部署；
+- Helm、Argo CD 和 Argo Rollouts；
+- Prometheus、Grafana、Loki 和 OpenTelemetry；
+- 受约束的 Ops Gateway；
+- 工作负载生成和故障注入；
+- 策略强制执行、RBAC、动作审计和恢复验证。
 
-## Boundary
+## 边界
 
-The platform exposes only versioned, structured capabilities defined in `../contracts/openapi.yaml`. It must not execute arbitrary commands supplied by the Agent.
+平台只能暴露 `../contracts/openapi.yaml` 中定义的版本化结构化能力，不得执行 Agent 提供的任意命令。
 
-Read and write identities must be separated. Mutating actions must be allowlisted, idempotent, auditable, and independently verified after execution.
+只读身份与写入身份必须分离。所有变更类动作必须经过 allowlist 限制，具备幂等性和审计记录，并在执行后接受独立验证。
 
-## Initial backlog
+## 初始任务
 
-1. Bootstrap three minimal demo services with health, metrics, and structured logs.
-2. Build the Docker Compose development platform.
-3. Implement deployment metadata and metric comparison endpoints.
-4. Add a stable k6 checkout workload.
-5. Implement the slow-SQL scenario with TTL and cleanup.
-6. Add policy-gated rollback and recovery verification.
+1. 建立三个包含健康检查、指标和结构化日志的最小 Demo 服务。
+2. 建立 Docker Compose 开发平台。
+3. 实现部署元数据与指标对比接口。
+4. 增加稳定的 k6 checkout 工作负载。
+5. 实现带 TTL 和清理流程的 slow SQL 场景。
+6. 增加策略门控回滚和恢复验证。
 
-See [the DevOps/Platform engineering playbook](../docs/DEVOPS_PLATFORM_PLAYBOOK.md) for the complete plan.
+完整计划参见 [DevOps / Platform 工程负责人执行手册](../docs/DEVOPS_PLATFORM_PLAYBOOK.md)。

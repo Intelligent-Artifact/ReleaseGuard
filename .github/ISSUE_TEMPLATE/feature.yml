@@ -1,53 +1,53 @@
-name: Feature
-description: Propose an Agent, platform, contract, scenario, or integration feature.
-title: "[Feature]: "
+name: 功能需求
+description: 提议 Agent、平台、契约、事故场景或端到端集成功能。
+title: "[功能]: "
 labels:
   - enhancement
 body:
   - type: dropdown
     id: area
     attributes:
-      label: Area
+      label: 所属区域
       options:
         - Agent
         - Platform
-        - Contract
-        - Incident scenario
-        - End-to-end integration
-        - Documentation
+        - 契约
+        - 事故场景
+        - 端到端集成
+        - 文档
     validations:
       required: true
   - type: input
     id: owner
     attributes:
-      label: Owner
-      placeholder: "@Manticore0918, @adminxue, or both"
+      label: 负责人
+      placeholder: "@Manticore0918、@adminxue 或双方"
     validations:
       required: true
   - type: textarea
     id: problem
     attributes:
-      label: Problem
-      description: What engineering problem or user outcome does this address?
+      label: 问题
+      description: 这项功能要解决什么工程问题或用户目标？
     validations:
       required: true
   - type: textarea
     id: contract
     attributes:
-      label: Contract and dependencies
-      description: List API fields, schemas, providers, consumers, and blocking work.
+      label: 契约与依赖
+      description: 列出相关 API 字段、Schema、提供方、消费方和阻塞任务。
   - type: textarea
     id: acceptance
     attributes:
-      label: Acceptance criteria
+      label: 验收标准
       placeholder: |
-        - [ ] Observable result
-        - [ ] Failure behavior
-        - [ ] Required tests
+        - [ ] 可观察的结果
+        - [ ] 失败时的行为
+        - [ ] 必须执行的测试
     validations:
       required: true
   - type: textarea
     id: safety
     attributes:
-      label: Safety, rollback, and cleanup
-      description: Describe permissions, blast radius, rollback, and cleanup requirements.
+      label: 安全、回滚与清理
+      description: 说明权限、影响范围、回滚和清理要求。

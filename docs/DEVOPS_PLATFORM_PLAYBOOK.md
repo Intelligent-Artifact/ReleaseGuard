@@ -1,6 +1,6 @@
 # ReleaseGuard：DevOps / Platform 工程负责人执行手册
 
-> 适用角色：运维朋友（DevOps / Platform Engineer）<br>
+> 适用角色：运维朋友（DevOps / Platform 工程师）<br>
 > 配套文档：[AGENT_ENGINEER_PLAYBOOK.md](./AGENT_ENGINEER_PLAYBOOK.md)<br>
 > 项目目标：为 AI 辅助的发布诊断与安全处置提供可重复、可观测、可审计、可恢复的平台，而不只是“把 AI 服务部署起来”。
 
@@ -9,7 +9,7 @@
 你负责 ReleaseGuard 的运行底座和安全执行面。最终成果必须证明你能设计一套真实的软件交付与可靠性平台：
 
 1. 服务经过 CI 构建、测试和扫描，产出可追溯的不可变镜像。
-2. 新版本通过 canary / progressive delivery 上线，而不是直接全量替换。
+2. 新版本通过 canary / 渐进式交付上线，而不是直接全量替换。
 3. 每个版本都有统一的 metrics、logs、traces、deployment metadata。
 4. 平台能稳定复现故障，并保留明确 ground truth。
 5. Agent 只能通过受控的 Ops Gateway 查询和申请动作，不能直接获得集群管理员权限。
@@ -19,22 +19,22 @@
 
 你的价值不在于“写了 Dockerfile 和 compose”，而在于：设计发布流程、可观测性、SLO、故障注入、安全运维 API、回滚与恢复验证，并让 AI 只能在这套边界内工作。
 
-## 2. Ownership：你拥有和不拥有的部分
+## 2. 职责归属：你拥有和不拥有的部分
 
 ### 2.1 你直接负责
 
-- Demo Application：用于发布、流量、故障注入和恢复测试的微服务系统。
-- Container Platform：Docker、Docker Compose、镜像规范、健康检查和本地持久化。
-- Kubernetes Platform：namespace、workload、Service、ConfigMap、Secret、resource limit、PDB、NetworkPolicy。
-- Packaging / GitOps：Helm、Argo CD、环境配置和部署同步。
-- Progressive Delivery：Argo Rollouts、canary steps、analysis、promote、hold 和 rollback。
+- Demo 应用：用于发布、流量、故障注入和恢复测试的微服务系统。
+- 容器平台：Docker、Docker Compose、镜像规范、健康检查和本地持久化。
+- Kubernetes 平台：namespace、workload、Service、ConfigMap、Secret、资源限制、PDB、NetworkPolicy。
+- 打包 / GitOps：Helm、Argo CD、环境配置和部署同步。
+- 渐进式交付：Argo Rollouts、canary steps、analysis、promote、hold 和 rollback。
 - CI/CD：GitHub Actions、测试、构建、扫描、镜像发布和部署触发。
-- Observability：Prometheus、Grafana、Loki、OpenTelemetry / Tempo、告警和 dashboard。
+- 可观测性：Prometheus、Grafana、Loki、OpenTelemetry / Tempo、告警和 dashboard。
 - Ops Gateway：向 Agent 暴露受限的只读查询与动作接口。
-- Security Enforcement：RBAC、service account、allowlist、policy enforcement、审批校验、审计。
-- Fault Injection：可重复、安全、有清理步骤的故障场景。
-- Workload / Traffic：k6 或等价工具，保证 baseline 与 canary 可比较。
-- Recovery Verification：从基础设施角度确认回滚后系统真正恢复。
+- 安全强制执行：RBAC、service account、allowlist、policy enforcement、审批校验、审计。
+- 故障注入：可重复、安全、有清理步骤的故障场景。
+- 工作负载 / 流量：k6 或等价工具，保证 baseline 与 canary 可比较。
+- 恢复验证：从基础设施角度确认回滚后系统真正恢复。
 - 平台侧单元测试、契约测试、集成测试、部署测试和演练 runbook。
 
 ### 2.2 你与 Agent 负责人共同负责
@@ -58,27 +58,27 @@
 
 ```mermaid
 flowchart TB
-    GH["GitHub PR / Commit"] --> CI["GitHub Actions\nTest / Scan / Build"]
-    CI --> REG["Container Registry"]
-    CI --> GITOPS["GitOps Config"]
+    GH["GitHub PR / Commit"] --> CI["GitHub Actions\n测试 / 扫描 / 构建"]
+    CI --> REG["容器镜像仓库"]
+    CI --> GITOPS["GitOps 配置"]
     GITOPS --> ARGO["Argo CD"]
-    ARGO --> ROLLOUTS["Argo Rollouts\nBaseline v1 / Canary v2"]
-    LOAD["k6 Workload"] --> APP["Demo Microservices"]
+    ARGO --> ROLLOUTS["Argo Rollouts\n基线 v1 / Canary v2"]
+    LOAD["k6 工作负载"] --> APP["Demo 微服务"]
     ROLLOUTS --> APP
-    APP --> OTEL["Metrics / Logs / Traces"]
+    APP --> OTEL["指标 / 日志 / 链路"]
     OTEL --> OBS["Prometheus / Loki / Tempo / Grafana"]
-    CHAOS["Fault Injection"] --> APP
-    AGENT["ReleaseGuard Agent"] -->|"Versioned API only"| GW["Ops Gateway"]
+    CHAOS["故障注入"] --> APP
+    AGENT["ReleaseGuard Agent"] -->|"仅使用版本化 API"| GW["Ops Gateway"]
     GW --> OBS
     GW --> ROLLOUTS
     GW --> K8S["Kubernetes API"]
-    GW --> AUDIT["Policy / RBAC / Audit"]
-    GW -->|"Action status + verification"| AGENT
+    GW --> AUDIT["策略 / RBAC / 审计"]
+    GW -->|"动作状态 + 验证结果"| AGENT
 ```
 
 核心原则：
 
-- Control Plane 与 Demo Workload 分离。
+- 控制面与 Demo 工作负载分离。
 - Agent 与 Kubernetes API 分离。
 - 只读查询和写操作使用不同权限。
 - 故障注入权限与处置权限分离。
@@ -183,12 +183,12 @@ client / k6
 - 错误率：5xx 和业务失败分别统计。
 - 延迟 histogram：p50、p95、p99 可计算。
 - active requests 和 queue depth。
-- CPU、memory、restart count。
-- PostgreSQL query duration、connection pool used/waiting。
+- CPU、内存和重启次数。
+- PostgreSQL 查询耗时、连接池已用连接数和等待数。
 - Redis error、latency 和 connection 状态。
 - rollout 当前权重和 replica 状态。
 
-## 6. Docker Compose MVP
+## 6. Docker Compose 最小可行版本
 
 ### 6.1 服务范围
 
@@ -245,7 +245,7 @@ Phase 2 再迁移到 Kubernetes。建议顺序：
 - 独立 namespace，如 `releaseguard-demo`、`releaseguard-control`。
 - Deployment/Rollout 具有 readiness、liveness、startup probe。
 - 明确 requests/limits。
-- PodDisruptionBudget 和 termination grace period。
+- PodDisruptionBudget 和终止宽限期。
 - ServiceAccount 最小权限。
 - NetworkPolicy 限制 Agent、Gateway、observability 和 workload 通信。
 - ConfigMap / Secret 更新有明确 rollout 策略。
@@ -267,21 +267,21 @@ Phase 2 再迁移到 Kubernetes。建议顺序：
 - Argo CD Application 使用 Project 限制目标集群和 namespace。
 - 默认不启用危险 prune；启用时明确资源白名单和同步窗口。
 - 紧急 rollback 发生后，要有自动或人工流程把 Git 期望状态同步回来，避免 drift。
-- 保存 Argo sync revision、image digest 和 application health 作为部署证据。
+- 保存 Argo 同步 revision、镜像 digest 和应用健康状态作为部署证据。
 
-## 8. Progressive Delivery
+## 8. 渐进式交付
 
 推荐的初始 canary 策略：
 
 ```text
-deploy candidate
+部署 candidate
   → 10% traffic
   → 观察 2–5 分钟
-  → analysis check
+  → 分析检查
   → 25%
   → 观察
   → 50%
-  → manual promotion 或自动 promotion
+  → 人工 promote 或自动 promote
   → 100%
 ```
 
@@ -294,17 +294,17 @@ Demo 中需要支持：
 
 ### 8.1 Analysis 指标
 
-- candidate error rate 不超过 baseline + 允许阈值。
+- candidate 错误率不超过 baseline + 允许阈值。
 - candidate p95 不超过 SLO，且相对 baseline 增幅受限。
-- candidate ready replica 达标。
+- candidate ready replica 数量达标。
 - 关键依赖健康。
 - 指标样本量足够；无数据不能判成功。
 
 Argo Rollouts 的自动 analysis 是平台保护线，Agent 是更丰富的调查与建议层。即使 Agent 不可用，基础发布门禁仍应工作。
 
-## 9. Observability
+## 9. 可观测性
 
-### 9.1 Metrics / Prometheus
+### 9.1 指标 / Prometheus
 
 - 记录规则预计算常用 SLI，避免 Agent 反复执行昂贵查询。
 - 给 Gateway 暴露模板化查询，不接受任意 PromQL。
@@ -321,7 +321,7 @@ service:request_rate_5m{service,version,environment}
 service:availability_5m{service,version,environment}
 ```
 
-### 9.2 Logs / Loki
+### 9.2 日志 / Loki
 
 日志字段建议统一：
 
@@ -336,7 +336,7 @@ service:availability_5m{service,version,environment}
   "trace_id": "abc123",
   "event": "slow_db_query",
   "duration_ms": 418,
-  "message": "discount history query exceeded threshold"
+  "message": "折扣历史查询超过延迟阈值"
 }
 ```
 
@@ -347,28 +347,28 @@ service:availability_5m{service,version,environment}
 - Loki labels 保持低基数；trace ID 放正文而非 label。
 - Gateway 返回聚合、代表性事件和日志引用，不一次返回大量原文。
 
-### 9.3 Traces / OpenTelemetry
+### 9.3 链路 / OpenTelemetry
 
 Phase 3 接入，但应用从 V1 开始传播 trace context，避免后期重构。
 
-- 统一 service resource attributes。
+- 统一服务资源属性。
 - HTTP、数据库、Redis 调用建立 span。
 - span 包含 version、deployment ID、route，但不包含 secret。
 - logs 写入 trace ID，Gateway 可按 trace 反查相关日志。
 - Tempo / collector 故障不能阻塞业务请求。
 
-### 9.4 Grafana Dashboard
+### 9.4 Grafana 看板
 
 至少准备四个 dashboard：
 
-1. Release Overview：baseline/canary 权重、版本、commit、rollout 状态。
-2. Service SLO：流量、错误、延迟、availability。
-3. Incident Detail：时间线、关键 metrics、logs、traces、action status。
-4. Eval Results：RCA、处置、安全、恢复、诊断时延、MTTR、成本。
+1. 发布概览：baseline/canary 权重、版本、commit、rollout 状态。
+2. 服务 SLO：流量、错误、延迟、可用性。
+3. 事故详情：时间线、关键指标、日志、链路和动作状态。
+4. 评测结果：RCA、处置、安全、恢复、诊断时延、MTTR 和成本。
 
 Dashboard JSON 必须入库，禁止只保存在个人 Grafana 实例。
 
-## 10. Ops Gateway
+## 10. 运维网关（Ops Gateway）
 
 Ops Gateway 是双方最重要的工程边界。它不是一个通用远程 shell，而是受约束的运维能力 API。
 
@@ -404,7 +404,7 @@ V1–V3 只开放少量动作：
 - pause / hold rollout；
 - rollback 到明确版本或 revision；
 - 可选：重启单个受控制器管理的异常副本；
-- recovery verification。
+- 恢复验证。
 
 禁止开放：
 
@@ -496,13 +496,13 @@ Gateway Reader 与 Executor 最好使用不同 service account；写权限只有
 - 验证结果；
 - 错误和人工干预。
 
-## 12. Recovery Verification
+## 12. 恢复验证
 
 动作执行成功不等于事故解决。平台验证至少包含：
 
 1. Rollout 不再向故障版本发送流量。
 2. 目标版本的 ready replicas 达到期望数量。
-3. readiness / synthetic health check 连续通过。
+3. readiness / 合成健康检查连续通过。
 4. 错误率回到 SLO 范围。
 5. p95 延迟回到阈值内，并接近 baseline。
 6. 请求量足够，避免在没有流量时误判恢复。
@@ -528,7 +528,7 @@ Gateway Reader 与 Executor 最好使用不同 service account；写权限只有
 
 若验证失败，action 状态为 `VERIFICATION_FAILED`，由人决定下一步；不要自动连续尝试多个高影响动作。
 
-## 13. Fault Injection / Incident Replay
+## 13. 故障注入与事故重放
 
 这是你最能体现 SRE 和平台能力的部分。
 
@@ -538,7 +538,7 @@ Gateway Reader 与 Executor 最好使用不同 service account；写权限只有
 
 ```yaml
 id: slow-sql-v1
-title: Candidate-only slow discount query
+title: 仅 candidate 出现的折扣慢查询
 target:
   environment: demo
   service: payment-service
@@ -577,16 +577,16 @@ limits:
 
 | 场景 | 注入方式 | 主要信号 | 正确处置方向 |
 |---|---|---|---|
-| Slow SQL | candidate feature flag / 特定代码版本 | p95、DB span、slow query log | hold / rollback |
-| Memory leak | candidate 内存增长 | RSS、GC、OOM/restart | rollback |
-| Bad environment variable | 错误配置 | startup/readiness、config error | rollback config/release |
-| DB pool exhaustion | 限制 pool + 并发流量 | waiters、timeout、latency | rollback/hold，必要时扩容由人处理 |
-| Redis outage | 暂停或隔离 Redis | dependency error、fallback behavior | 恢复依赖或 hold；不能误删数据 |
-| Dependency timeout | 网络延迟或 mock | downstream span、timeout log | rollback/hold |
-| CPU saturation | 限制资源或 stress | throttling、CPU、latency | 调整/rollback，按场景 ground truth |
-| Wrong resource limit | candidate manifest 变更 | OOMKilled/event、restart | rollback manifest |
-| DNS failure | demo namespace 内受控注入 | resolution error、dependency failure | 清理注入，不误判代码 |
-| Bad deployment | readiness 或镜像配置问题 | rollout degraded、event | abort/rollback |
+| 慢 SQL | candidate 功能开关 / 特定代码版本 | p95、DB span、慢查询日志 | hold / rollback |
+| 内存泄漏 | candidate 内存增长 | RSS、GC、OOM/重启 | rollback |
+| 错误环境变量 | 错误配置 | 启动/readiness、配置错误 | 回滚配置或发布 |
+| 数据库连接池耗尽 | 限制连接池 + 并发流量 | 等待数、超时、延迟 | rollback/hold，必要时由人扩容 |
+| Redis 不可用 | 暂停或隔离 Redis | 依赖错误、降级行为 | 恢复依赖或 hold；不能误删数据 |
+| 依赖超时 | 网络延迟或 mock | 下游 span、超时日志 | rollback/hold |
+| CPU 饱和 | 限制资源或压力注入 | 节流、CPU、延迟 | 调整/rollback，按场景 ground truth |
+| 资源限制错误 | candidate manifest 变更 | OOMKilled、事件、重启 | 回滚 manifest |
+| DNS 故障 | demo namespace 内受控注入 | 解析错误、依赖失败 | 清理注入，不误判代码 |
+| 错误部署 | readiness 或镜像配置问题 | rollout 退化、事件 | abort/rollback |
 
 每个场景必须：
 
@@ -599,7 +599,7 @@ limits:
 - 记录实际注入参数供 evaluator 使用；
 - Agent 无权读取 ground truth。
 
-### 13.3 Workload
+### 13.3 工作负载
 
 使用 k6 建立稳定、可重复的 profile：
 
@@ -615,18 +615,18 @@ limits:
 
 ### 14.1 Pull Request 流程
 
-- lint / format；
-- unit test；
-- integration test；
-- OpenAPI contract test；
-- Docker build；
-- dependency 和 image scan；
-- Helm lint / template test；
-- Kubernetes manifest policy check；
-- compose smoke test；
+- 代码检查 / 格式检查；
+- 单元测试；
+- 集成测试；
+- OpenAPI 契约测试；
+- Docker 构建；
+- 依赖与镜像扫描；
+- Helm 检查 / 模板测试；
+- Kubernetes manifest 策略检查；
+- Compose 冒烟测试；
 - 不部署共享环境。
 
-### 14.2 Main / Release 流程
+### 14.2 主分支 / 发布流程
 
 1. 基于 commit 构建镜像。
 2. 生成 SBOM 和扫描结果。
@@ -642,7 +642,7 @@ limits:
 - 使用最小权限的短时凭据，优先 OIDC。
 - fork PR 不接触 deployment secret。
 - pin 第三方 Actions 到 commit SHA。
-- 保护 main、环境和 production-like approval。
+- 保护 main、环境和类生产环境审批。
 - artifact、镜像、SBOM 和部署记录有 retention 策略。
 - 失败不能自动跳过扫描或策略检查。
 
@@ -653,7 +653,7 @@ limits:
 - Gateway 参数校验、allowlist、错误码。
 - policy rule 与 approval token 校验。
 - idempotency、冲突 action 和状态转换。
-- metrics/logs/traces adapter 的无数据和超时处理。
+- 指标/日志/链路适配器的无数据和超时处理。
 - 与 Agent 共同维护 OpenAPI fixture。
 
 ### 15.2 Compose / Kubernetes 集成测试
@@ -681,13 +681,13 @@ limits:
 - Gateway 在 action 中途重启。
 - Argo API 暂时不可用。
 - Prometheus 数据延迟或缺失。
-- GitOps desired state 与紧急 rollback 后状态不一致。
+- GitOps 期望状态与紧急 rollback 后状态不一致。
 - 故障注入进程崩溃但 TTL 清理仍执行。
 - 演示环境一键重建。
 
 ## 16. 分阶段交付计划
 
-### Phase 0：契约和本地底座（0.5–1 天）
+### 阶段 0：契约和本地底座（0.5–1 天）
 
 - [ ] 与 Agent 负责人确定 service/version/deployment/commit 字段。
 - [ ] 共同完成 OpenAPI 初稿、示例响应和错误码。
@@ -697,7 +697,7 @@ limits:
 
 完成标准：Agent 可用 fixture 开发；平台可独立启动并返回稳定的部署元数据。
 
-### Phase 1：Docker Compose MVP（约 1 周）
+### 阶段 1：Docker Compose MVP（约 1 周）
 
 - [ ] 所有服务、数据库、缓存、Prometheus、Grafana、Loki 一键启动。
 - [ ] k6 生成稳定流量并区分 v1/v2。
@@ -709,7 +709,7 @@ limits:
 
 完成标准：全新机器按 README 可启动 demo、注入故障、看到回归、完成清理；连续运行 3 次结果一致。
 
-### Phase 2：Kubernetes / GitOps
+### 阶段 2：Kubernetes / GitOps
 
 - [ ] Helm chart、demo namespace 和最小 RBAC。
 - [ ] GitHub Actions 构建不可变镜像。
@@ -721,22 +721,22 @@ limits:
 
 完成标准：candidate 发生回归后可以受控 rollback，Git 与运行状态最终一致，Agent 无集群直连权限。
 
-### Phase 3：Portfolio 版本
+### 阶段 3：作品集版本
 
 - [ ] OpenTelemetry + Tempo 全链路追踪。
 - [ ] 10 个以上故障场景和多种 workload。
 - [ ] Eval dashboard 展示成功和失败结果。
-- [ ] NetworkPolicy、RBAC 和 adversarial security tests。
+- [ ] NetworkPolicy、RBAC 和对抗性安全测试。
 - [ ] 平台重建、备份/恢复和故障清理 runbook。
 - [ ] 架构图、ADR、操作手册、演示视频和个人贡献说明。
 
 完成标准：项目展示的是可靠交付平台，而非只在本地跑通的一次性 demo。
 
-### Phase 4：有余力再做
+### 阶段 4：有余力再做
 
 - Terraform 部署云环境；
 - Chaos Mesh；
-- SLO / error budget 自动门禁；
+- SLO / 错误预算自动门禁；
 - 镜像签名与 admission policy；
 - 多环境 promotion；
 - 长期 incident 数据存储。
@@ -745,20 +745,20 @@ limits:
 
 | 优先级 | Issue | 输出 |
 |---|---|---|
-| P0 | Define Agent–Gateway OpenAPI v1 | OpenAPI、fixtures、错误码 |
-| P0 | Bootstrap demo services | health、metrics、structured logs |
-| P0 | Add Compose platform | 一键启动、health、networks、volumes |
-| P0 | Add deployment metadata API | version、commit、timestamp、status |
-| P0 | Add templated metrics compare API | baseline/candidate 对比 |
-| P1 | Add Loki and logs API | JSON logs、聚合、引用 |
-| P1 | Add k6 checkout profile | 稳定 workload、结果报告 |
-| P1 | Add slow SQL scenario | inject/verify/cleanup/ground truth |
-| P1 | Add Gateway policy and audit | allowlist、审批、审计 |
-| P1 | Add recovery verification | health、SLO、rollout |
-| P2 | Add Helm and Argo CD | GitOps 部署 |
-| P2 | Add Argo Rollouts canary | hold/promote/rollback |
-| P2 | Add OpenTelemetry/Tempo | traces 与日志关联 |
-| P2 | Add security test suite | RBAC、replay、injection |
+| P0 | 定义 Agent–Gateway OpenAPI v1 | OpenAPI、测试夹具、错误码 |
+| P0 | 建立 Demo 服务骨架 | 健康检查、指标、结构化日志 |
+| P0 | 增加 Compose 平台 | 一键启动、健康检查、网络、数据卷 |
+| P0 | 增加部署元数据 API | 版本、commit、时间戳、状态 |
+| P0 | 增加模板化指标对比 API | baseline/candidate 对比 |
+| P1 | 增加 Loki 与日志 API | JSON 日志、聚合、引用 |
+| P1 | 增加 k6 checkout 配置 | 稳定工作负载、结果报告 |
+| P1 | 增加 slow SQL 场景 | 注入、验证、清理、ground truth |
+| P1 | 增加 Gateway 策略与审计 | allowlist、审批、审计 |
+| P1 | 增加恢复验证 | 健康状态、SLO、rollout |
+| P2 | 增加 Helm 与 Argo CD | GitOps 部署 |
+| P2 | 增加 Argo Rollouts canary | hold、promote、rollback |
+| P2 | 增加 OpenTelemetry / Tempo | 链路与日志关联 |
+| P2 | 增加安全测试集 | RBAC、重放、注入 |
 
 每个 issue 写清 owner、依赖、接口变化、验收命令、失败清理方式和需要 Agent 配合的内容。
 
@@ -779,7 +779,7 @@ limits:
 - OpenAPI 和错误码；
 - 正常、无数据、部分数据、超时、权限错误 fixture；
 - service/version/deployment/commit 的字段定义；
-- query 和 resource source refs；
+- 查询和资源来源引用；
 - 速率、时间窗、并发和重试限制；
 - 动作的风险、审批、幂等和状态语义；
 - 故障场景的对外症状，但不把 ground truth 暴露给 Agent 运行时。
@@ -803,7 +803,7 @@ limits:
 - 返回数据是否过大或缺少聚合；
 - 动作状态是否足够生成 incident timeline。
 
-## 19. 你的 Definition of Done
+## 19. 你的完成定义
 
 一个平台功能同时满足以下条件才算完成：
 
@@ -817,11 +817,11 @@ limits:
 - [ ] 动作幂等并有持久状态、审计和 correlation ID。
 - [ ] 有正常、超时、无数据、权限不足和执行失败测试。
 - [ ] 故障注入有前置检查、TTL、验证和幂等清理。
-- [ ] Recovery Verification 检查真实 SLO 和最小样本量。
+- [ ] 恢复验证检查真实 SLO 和最小样本量。
 - [ ] README、runbook、dashboard 和契约已更新。
 - [ ] 至少一个真实端到端场景通过，失败路径也验证过。
 
-## 20. Demo Runbook
+## 20. 演示运行手册
 
 建议把平台演示控制在 6–8 分钟：
 
@@ -833,12 +833,12 @@ limits:
 6. 展示 Agent 只能通过 Gateway 查询，没有 Kubernetes 权限。
 7. 展示 rollback 请求因审批要求被阻塞。
 8. 批准后展示 action 状态、Argo rollback 和审计记录。
-9. 展示 Recovery Verification：ready、error、latency、traffic 全部通过。
+9. 展示恢复验证：ready、错误率、延迟和流量全部通过。
 10. 展示场景自动清理以及 GitOps 状态重新收敛。
 
 面试时重点讲：为什么选择 progressive delivery、如何保证可比较指标、为什么 Agent 不应有集群权限、动作如何幂等、审批如何防重放、故障注入如何安全清理，以及 rollback 后如何处理 GitOps drift。
 
-## 21. 必备 Runbooks
+## 21. 必备运行手册
 
 至少维护以下操作手册：
 
@@ -877,7 +877,7 @@ limits:
 5. 实现 deployment metadata 与 metrics compare 两个 Gateway 接口。
 6. 完成 slow SQL 场景的 inject、verify、TTL、cleanup 和 ground truth。
 7. 与 Agent 跑通只读 RCA，再加入 policy、审批和 rollback。
-8. 加入 Recovery Verification 和审计，重复运行同一场景 3 次。
+8. 加入恢复验证和审计，重复运行同一场景 3 次。
 9. Compose 稳定后再迁移 Helm、Argo CD 和 Argo Rollouts。
 10. 最后扩展 traces、10 个场景、eval dashboard 和云部署。
 

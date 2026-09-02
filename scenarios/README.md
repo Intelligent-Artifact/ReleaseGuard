@@ -1,41 +1,41 @@
-# Incident Scenarios
+# 事故场景
 
-Primary owners: [@Manticore0918](https://github.com/Manticore0918) and [@adminxue](https://github.com/adminxue)
+共同负责人：[@Manticore0918](https://github.com/Manticore0918) 和 [@adminxue](https://github.com/adminxue)
 
-This directory contains versioned and reproducible incident definitions used by the ReleaseGuard evaluation lab.
+本目录用于存放 ReleaseGuard 评测实验室使用的版本化、可重复事故定义。
 
-## Required scenario fields
+## 场景必填字段
 
-Each scenario should define:
+每个场景应定义：
 
-- target environment, service, and release version;
-- workload profile and preconditions;
-- bounded injection method and parameters;
-- expected symptoms and ground-truth root cause;
-- evidence the Agent should be able to discover;
-- acceptable and forbidden actions;
-- recovery checks and thresholds;
-- injection TTL and maximum MTTR;
-- idempotent cleanup procedure.
+- 目标 environment、service 和发布版本；
+- 工作负载配置和前置条件；
+- 有边界的注入方式和参数；
+- 预期症状和真实根因；
+- Agent 应能发现的证据；
+- 允许和禁止的动作；
+- 恢复检查和阈值；
+- 注入 TTL 和最大 MTTR；
+- 幂等清理流程。
 
-## Safety rules
+## 安全规则
 
-- Scenarios may affect only the dedicated demo environment.
-- Every injection requires a maximum TTL and automatic cleanup.
-- Preconditions must prove the baseline is healthy.
-- Injection and cleanup must be independently verified.
-- The Agent runtime must not be able to read ground-truth answers.
-- Failed setup or cleanup must be visible in the evaluation result.
+- 场景只能影响专用 Demo 环境。
+- 每次注入都必须设置最大 TTL 并支持自动清理。
+- 前置检查必须证明 baseline 健康。
+- 注入和清理结果必须独立验证。
+- Agent 运行时不得读取 ground truth。
+- 初始化或清理失败必须显示在评测结果中。
 
-## Initial scenarios
+## 初始场景
 
-1. Candidate-only slow SQL query.
-2. Candidate memory leak.
-3. Invalid environment configuration.
-4. Database connection-pool exhaustion.
-5. Redis outage.
-6. Dependency timeout.
-7. CPU saturation.
-8. Incorrect Kubernetes resource limit.
-9. Scoped DNS failure.
-10. Degraded deployment/readiness failure.
+1. 仅 candidate 出现的 slow SQL 查询。
+2. candidate 内存泄漏。
+3. 错误环境变量。
+4. 数据库连接池耗尽。
+5. Redis 不可用。
+6. 下游依赖超时。
+7. CPU 饱和。
+8. Kubernetes 资源限制错误。
+9. 受控范围内的 DNS 故障。
+10. 部署或 readiness 退化。
