@@ -65,4 +65,6 @@ v0.1 不要求 Docker Compose、真实 Prometheus、三微服务或 Kubernetes�
 
 ## 当前状态
 
-仓库当前已包含协作骨架、第一版 API 契约和 Agent Developer Preview。下一项共同目标是完成独立 HTTP Mock Gateway 与跨进程联合闭环，发布 `portfolio-v0.1.0`；Compose、完整可观测性和 Kubernetes 不再阻塞首个 Portfolio Release。
+PR #1 与 PR #2 已合入 `main`：仓库当前包含协作骨架、第一版 API 契约、Agent Developer Preview，以及三个早期 demo service 原型。双方已完成双向 review 和干净环境复验；Developer Preview 尚需收尾 `main` 保护、最小 CI 与 OpenAPI 联合签收。
+
+下一项共同目标是按 G1–G4 推进独立 HTTP Mock Gateway、Evidence RCA、安全动作与联合评测，发布 `portfolio-v0.1.0`。v0.2 只正式支持 `payment-service`；现有 `order-service` 和 `promo-service` 暂作为历史原型保留，不扩大当前维护范围。Compose、完整可观测性和 Kubernetes 不再阻塞首个 Portfolio Release。

@@ -490,19 +490,17 @@ v0.1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 - [x] 建立 Investigation、Evidence、Finding、ActionProposal 与 IncidentReport 模型。
 - [x] 用共享 fixture 跑通确定性调查、保守裁决和 JSON/Markdown 报告。
 - [x] 覆盖正常回归、证据缺失、不可比较数据和回滚契约测试。
-- [ ] 通过平台负责人 review 后合并到 `main`，保存干净环境验收输出。
+- [x] PR #2 已通过平台负责人 review、干净环境复验并合并到 `main`。
+- [ ] 与平台负责人完成 OpenAPI 字段、缺失数据和指标方向语义的联合签收。
 
 完成标准：Agent 能独立验证契约和调查语义，但此版本只作为开发基础，不作为正式 Portfolio Release。
 
-### v0.1：联合 Portfolio MVP（4–7 个有效开发日）
+### v0.1：联合 Portfolio MVP（7–12 个有效开发日）
 
-- [ ] 通过独立 HTTP Mock Gateway 获取 deployment、metrics、logs 和 Git Evidence，运行时不直接读取平台 fixture。
-- [ ] 增加一个真实 tool-calling 模型适配器和确定性测试替身，两者共用调查路径。
-- [ ] 完成 baseline/candidate 关联、结构化 RCA、替代假设和 evidence ID 校验。
-- [ ] 完成确定性 policy、approve/reject/expire、action polling 和 recovery investigation。
-- [ ] 与平台侧跑通未审批拒绝、幂等 rollback、独立恢复验证和审计链路。
-- [ ] 建立 rollback、`HOLD`、`INCONCLUSIVE`、恶意日志四个场景的外部 evaluator。
-- [ ] 为 fast/full 两档生成报告、评测结果和演示材料。
+- [ ] G1：通过独立 HTTP Mock Gateway 获取 deployment、metrics、logs 和 Git Evidence；实现指标方向语义，运行时不直接读取平台 fixture。
+- [ ] G2：完成 baseline/candidate 关联、结构化 RCA、替代假设和 evidence ID 校验；fast/full 共用同一调查路径。
+- [ ] G3：实现确定性 policy、action polling 和 recovery classification；审批凭据与动作执行留在 Gateway。
+- [ ] G4：建立 rollback、`HOLD`、`INCONCLUSIVE`、恶意日志四个场景的外部 evaluator，并生成报告和演示材料。
 
 完成标准：双方通过真实 HTTP 边界完成一个 slow SQL 发布回归闭环；四个场景各重复 3 次，危险动作率为 0%，双方各有功能 PR 和跨边界 review。
 
@@ -528,7 +526,7 @@ v0.1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 
 - [ ] 通过 Gateway 接入 Kubernetes events、Argo Rollouts 状态、Git diff 和 GitOps 收敛信息。
 - [ ] 区分 candidate-only 回归、全局依赖故障和平台故障。
-- [ ] 支持 `PROMOTE`、`HOLD`、`ROLLBACK` 和 `ABORT` 的完整生命周期。
+- [ ] 继续使用 `PROMOTE`、`HOLD`、`ROLLBACK` 和 `INCONCLUSIVE` 决策；平台 abort/deny 只作为执行结果，不进入 Agent 决策枚举。
 - [ ] 在 Kubernetes 场景中继续执行同一套 grounding、policy、HITL 和 evaluator 门禁。
 
 完成标准：canary 出现回归后能够安全暂停或 rollback，证明稳定版本恢复 SLO，并保持 Agent 无集群直连权限。
@@ -546,7 +544,7 @@ v0.1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 
 | 优先级 | Issue | 输出 |
 |---|---|---|
-| P0 | 合并 Agent Developer Preview | fixture 调查、测试、JSON/Markdown 报告 |
+| P0 | 收尾 Developer Preview | OpenAPI 联合签收、指标方向语义、最小 CI |
 | P0 | 冻结 v0.1 Demo contract | deployment、metrics、logs、Git、action、recovery 契约 |
 | P0 | 实现 Ops Gateway HTTP client | 正常、超时、无数据、权限错误处理 |
 | P0 | 增加 fast/full 模型适配器 | 确定性替身、真实 tool-calling LLM、统一运行路径 |

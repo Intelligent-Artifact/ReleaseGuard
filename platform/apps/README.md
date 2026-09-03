@@ -1,6 +1,6 @@
-# ReleaseGuard Demo 应用
+# ReleaseGuard Demo 应用原型
 
-本目录包含 ReleaseGuard 的电商 demo 服务链路，用于后续的发布、故障注入、指标对比与恢复验证：
+本目录包含路线调整前已经合入的三个电商 demo 服务骨架：
 
 ```text
 client / k6
@@ -9,8 +9,9 @@ client / k6
             → promo-service（优惠计算）
 ```
 
-当前处于“阶段 0：最小健康端点与 telemetry”。三个服务尚未通过 HTTP 互相调用，
-但已经具备接入 Compose 后形成依赖链所需的全部基础设施端点与统一遥测字段。
+三个服务尚未通过 HTTP 互相调用。按照 portfolio-first 路线，v0.2 只正式支持
+`payment-service`，用于承载 baseline/candidate、真实流量和 slow SQL 场景；
+`order-service` 与 `promo-service` 作为历史原型保留，不构成当前交付或维护承诺。
 
 ## 目录结构
 
@@ -52,33 +53,31 @@ environment/trace_id 等低基数标签。
 
 前置条件：已验证 Python 3.10–3.12（Docker 基础镜像为 python:3.12-slim）；
 暂不声明支持更高 Python 版本，避免在未验证环境上给出错误承诺。
-首次运行先在三个服务目录分别安装固定版本依赖：
+v0.2 主线只需在 payment-service 目录安装固定版本依赖：
 
 ```powershell
-cd order-service
+cd payment-service
 pip install -r requirements.txt
 ```
 
-启动单个服务：
+启动主线服务：
 
 ```powershell
-.\scripts\run.ps1 -Service order-service
 .\scripts\run.ps1 -Service payment-service -Port 18002
 ```
 
 Linux/macOS：
 
 ```bash
-./scripts/run.sh order-service
 ./scripts/run.sh payment-service 18002
 ```
 
 冒烟验证：
 
 ```powershell
-curl.exe http://127.0.0.1:8001/healthz
-curl.exe http://127.0.0.1:8001/version
-curl.exe http://127.0.0.1:8001/metrics
+curl.exe http://127.0.0.1:18002/healthz
+curl.exe http://127.0.0.1:18002/version
+curl.exe http://127.0.0.1:18002/metrics
 ```
 
 ## 运行测试
@@ -106,7 +105,7 @@ docker build -f payment-service/Dockerfile -t releaseguard/payment-service:v1 .
 docker build -f promo-service/Dockerfile -t releaseguard/promo-service:v1 .
 ```
 
-镜像内以非 root 用户（UID/GID 10001）运行，并带 Docker HEALTHCHECK。
+镜像内以非 root 用户（UID/GID 10001）运行，并带 Docker HEALTHCHECK。v0.2 主线只构建和验收 payment-service；其他镜像命令用于维护历史原型时参考。
 
 ## 环境变量
 
@@ -124,6 +123,7 @@ docker build -f promo-service/Dockerfile -t releaseguard/promo-service:v1 .
 
 ## 下一步
 
-- 用 Docker Compose 把三个服务与 PostgreSQL、Redis、Prometheus、Grafana、Loki 组合起来。
-- 让 order-service 携带 `traceparent` 调用 payment-service 和 promo-service，形成真实传播链。
-- 为 payment-service 增加可按版本启用的 slow SQL 故障开关。
+- 按 #29 修复共享库与 payment-service 的已知复评问题。
+- 用最小 Docker Compose 启动 payment-service、Ops Gateway 和 Prometheus。
+- 为 payment-service 增加可按版本启用、可幂等清理的 slow SQL 故障开关。
+- 只有后续已验收场景确实需要时，才为 order-service 或 promo-service 建立独立 Issue 并恢复维护。

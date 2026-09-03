@@ -290,7 +290,9 @@ Demo 中需要支持：
 - `PROMOTE`：指标正常，继续发布。
 - `HOLD`：证据不足或遥测不可用，冻结当前权重。
 - `ROLLBACK`：确认 candidate 引入回归，恢复稳定版本。
-- `ABORT`：发布流程异常或违反策略，终止 rollout。
+- `INCONCLUSIVE`：证据缺失、冲突或不可比较，禁止自动改变发布状态。
+
+以上四项是 Agent 的标准 `Decision`。平台控制器仍可产生 abort/deny 操作结果，但它属于策略或执行状态；只有获准的 `ROLLBACK` 才能转换为 `ActionType=ROLLBACK_RELEASE`。
 
 ### 8.1 Analysis 指标
 
@@ -690,26 +692,24 @@ limits:
 ### Developer Preview：契约协作基线
 
 - [ ] 与 Agent 负责人确认 service/version/deployment/commit 字段、时间格式和错误码。
-- [ ] review Agent fixture 调查的契约用法、空值语义和动作边界。
-- [ ] 通过一次平台侧 PR 验证双方分支、review 与 merge 流程。
+- [x] 已通过 PR #2 review Agent fixture 调查的契约用法、空值语义和动作边界，并完成干净环境复验。
+- [x] 已通过 PR #1 验证平台侧分支、Agent review 与 merge 流程。
 
 完成标准：双方批准当前契约语义，Agent Developer Preview 可以合并；此阶段不要求 Compose 或真实服务。
 
-### v0.1：联合 Portfolio MVP（4–7 个有效开发日）
+### v0.1：联合 Portfolio MVP（7–12 个有效开发日）
 
-- [ ] 将共享 fixture 包装成独立 HTTP Mock Gateway，使 Agent 必须跨进程调用。
-- [ ] 提供 deployment、metrics、logs、Git change、action status 和 recovery evidence 的最小接口。
-- [ ] 为 slow SQL、证据不足、数据不可比和恶意日志四个场景提供版本化状态。
-- [ ] 在 Gateway 侧校验 environment、service、action、approval target 和 expiry。
-- [ ] 使用稳定 action ID 与 idempotency key，保存可展示的 audit trail。
-- [ ] 模拟 rollback 前后状态变化，并从独立 recovery 接口验证结果。
-- [ ] 与 Agent 负责人共同完成跨进程 E2E、重复评测、README 和录屏。
+- [ ] G1：将共享 fixture 包装成独立 HTTP Mock Gateway，提供最小只读 Evidence 接口，并与 Agent client 通过 contract tests。
+- [ ] G2：为 slow SQL 场景提供 deployment、metrics、logs、Git change 的版本化状态，支持有引用的 RCA。
+- [ ] G3：实现 approval 生命周期、稳定 action ID、idempotency key、audit trail 和独立 recovery evidence。
+- [ ] G4：补齐证据不足、数据不可比和恶意日志场景，与 Agent 负责人完成跨进程 E2E、重复评测和演示材料。
 
 完成标准：未审批写操作被拒绝，批准后的 rollback 只执行一次，恢复成功与失败均可验证；双方各有功能 PR 和跨边界 review。
 
 ### v0.2：Local Integration
 
-- [ ] 只创建一个 payment-service，统一 health、metrics、结构化日志和版本信息。
+- [ ] 只把 `payment-service` 纳入正式支持，统一 health、metrics、结构化日志和版本信息。
+- [ ] 已合入的 `order-service`、`promo-service` 作为历史原型保留，不进入 v0.2 主演示，也不形成当前维护承诺。
 - [ ] 用 Compose 启动 payment-service、Ops Gateway 和 Prometheus；状态存储按实际需要保持最小。
 - [ ] 建立稳定 workload 和真实 slow SQL 回归，能够区分 v1/v2。
 - [ ] 保持 v0.1 OpenAPI 不变，把 Mock Gateway 数据源替换为真实本地组件。
@@ -889,7 +889,7 @@ v1.0 完整平台演示再扩展为 6–8 分钟：
 4. 增加独立 recovery evidence，覆盖恢复成功与失败。
 5. 与 Agent 跑通 slow SQL、`HOLD`、`INCONCLUSIVE` 和恶意日志四条路径。
 6. 每个场景重复运行 3 次，完成联合 E2E、README、报告和录屏。
-7. 发布 `portfolio-v0.1.0` 后，只创建一个 payment-service 和最小 Compose/Prometheus 栈。
+7. 发布 `portfolio-v0.1.0` 后，只把 payment-service 纳入正式支持并建立最小 Compose/Prometheus 栈；其余已合入原型不进入主演示。
 8. v0.2 稳定后再扩展 Loki、traces、5–10 个场景和 eval dashboard。
 9. 最后迁移 Helm、Argo CD 和 Argo Rollouts，形成 v1.0 Platform Edition。
 

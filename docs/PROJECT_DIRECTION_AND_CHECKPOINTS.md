@@ -43,8 +43,8 @@
 4. 新版本出现错误率、延迟、资源或依赖回归。
 5. ReleaseGuard 收集 baseline 与 candidate 的 metrics、logs、traces、部署元数据和 Git diff。
 6. Agent 输出带证据 ID、替代假设、置信度和风险等级的根因结论。
-7. Agent 提出 `PROMOTE`、`HOLD`、`ROLLBACK` 或 `ABORT` 建议。
-8. 确定性策略判断动作是否允许；中风险动作等待人工审批；高风险动作直接禁止。
+7. Agent 输出 `PROMOTE`、`HOLD`、`ROLLBACK` 或 `INCONCLUSIVE` 决策建议。
+8. 确定性策略判断建议是否允许；获准的 `ROLLBACK` 才能生成 `ROLLBACK_RELEASE` 动作提案，中风险动作等待人工审批，高风险动作直接禁止。
 9. Ops Gateway 幂等地执行批准后的处置，并保存审计记录。
 10. 平台重新检查 rollout、健康状态、错误率、延迟和最小流量，确认系统是否恢复。
 11. Eval Lab 对 RCA、证据、处置、安全、耗时和 MTTR 进行评分。
@@ -166,7 +166,7 @@ ReleaseGuard 不再把“作品集发布”放在所有基础设施工作之后�
 | 版本 | 阶段 | 建议投入 | 最小可演示成果 | 当前状态 |
 |---|---|---:|---|---|
 | Developer Preview | Agent 契约与调查种子 | 0.5–1 天 | fixture → Evidence → Finding → 报告 | 🟡 进行中 |
-| v0.1 | 联合 Portfolio MVP | 4–7 天 | HTTP Mock Gateway + 单场景 RCA + 审批 + 幂等回滚 + 恢复验证 | ⬜ 未开始 |
+| v0.1 | 联合 Portfolio MVP | 7–12 个有效开发日 | HTTP Mock Gateway + 单场景 RCA + 审批 + 幂等回滚 + 恢复验证 | ⬜ 未开始 |
 | v0.2 | Local Integration | 1–2 周 | 单服务 Compose + Prometheus + 真实流量与回滚 | ⬜ 未开始 |
 | v0.3 | Reliability Lab | 1–2 周 | 多源遥测、5–10 个场景、重复评测与看板 | ⬜ 未开始 |
 | v1.0 | Platform Edition | 2–4 周 | Kubernetes + Argo Rollouts + GitOps + 完整安全边界 | ⬜ 未开始 |
@@ -185,19 +185,21 @@ Developer Preview 用于证明 Agent 领域模型与共享契约能够工作，�
 - ✅ 建立 Investigation、Evidence、Finding、ActionProposal 和 IncidentReport 模型。
 - ✅ Agent 可确定性地完成 fixture → Evidence → Finding → `HOLD` → JSON/Markdown 报告。
 - ✅ 当前 Agent 测试覆盖正常回归、数据缺失、不可比较指标、回滚建议形状和证据可追溯性。
+- ✅ PR #2 已由平台负责人完成 review、复验并合入 `main`。
+- ✅ PR #1 已由 Agent 负责人完成 review、复验并合入 `main`，形成双向协作证据。
+- ✅ 双方均已具备 collaborator、分支、PR、review 和 merge 能力。
 
 ### 尚需完成
 
-- [ ] 邀请 `@adminxue` 成为仓库协作者并确认可以 clone/push。
 - [ ] 为 `main` 开启 PR、1 人审批、禁止 force push 等保护规则。
 - [ ] 双方逐字段 review `contracts/openapi.yaml`。
-- [ ] 将 Agent Developer Preview 通过 PR 合并，并由平台负责人 review。
-- [ ] 保存一次干净环境的 CLI 与测试输出作为验收证据。
+- [ ] 将 contract、fixture、secret 检查放入最小 CI workflow。
+- [x] 保存一次干净环境的 CLI 与测试输出作为验收证据。
 
 ### 退出条件
 
-- [ ] 双方都能 clone、创建分支、提交 PR 和完成 review。
-- [ ] Agent fixture 调查与契约测试从干净环境通过。
+- [x] 双方都能 clone、创建分支、提交 PR 和完成 review。
+- [x] Agent fixture 调查与契约测试从干净环境通过。
 - [ ] 双方明确批准 OpenAPI 当前字段与缺失数据语义。
 - [ ] 仓库中没有 secret、真实 token 或 kubeconfig。
 
@@ -213,12 +215,20 @@ Developer Preview 用于证明 Agent 领域模型与共享契约能够工作，�
 Platform Mock Gateway 启动并加载 slow-sql 场景
   → 返回 v1/v2 部署、指标、日志和 Git 证据
   → Agent 通过 HTTP 工具调用完成发布关联与证据化 RCA
-  → 确定性策略输出 HOLD / ROLLBACK_RELEASE / INCONCLUSIVE
+  → Agent 输出 Decision=ROLLBACK，确定性策略生成 ActionProposal=ROLLBACK_RELEASE
   → 未审批时 Gateway 拒绝写操作
   → 人工批准后 Gateway 以 idempotency key 模拟 rollback
   → Agent 从独立 recovery 接口重新取证并验证恢复
   → 输出 incident report、audit trail 与 eval result
 ```
+
+### 状态与动作语义
+
+- `Decision`：`PROMOTE`、`HOLD`、`ROLLBACK`、`INCONCLUSIVE`，表示调查结论，不直接改变平台状态。
+- `ActionType`：v0.1 只允许 `ROLLBACK_RELEASE`，必须由确定性策略从获准的 `ROLLBACK` 转换得到。
+- `ActionStatus`：`PENDING_APPROVAL`、`APPROVED`、`REJECTED`、`RUNNING`、`SUCCEEDED`、`FAILED`。
+- `RecoveryStatus`：`RECOVERED`、`NOT_RECOVERED`、`INCONCLUSIVE`。
+- `ABORT` 是未来发布控制器可能产生的操作结果，不属于 v0.1/v1.0 的 Agent `Decision` 枚举。
 
 ### 最小工程范围
 
@@ -227,14 +237,14 @@ Platform Mock Gateway 启动并加载 slow-sql 场景
 - [ ] 实现 Ops Gateway HTTP client，运行时不直接读取平台 fixture。
 - [ ] 增加一个真实 tool-calling 模型适配器和确定性测试替身；两者共用调查、校验、策略和报告路径。
 - [ ] 形成带有效 evidence ID、替代假设、限制条件和置信度的 RCA。
-- [ ] 实现确定性风险策略、approve/reject/expire 流程和 recovery investigation。
+- [ ] 实现确定性风险策略，以及 recovery evidence 的分类与报告；不在 Agent 内实现审批凭据或动作执行。
 - [ ] 建立外部 evaluator，不允许 Agent 读取 ground truth 或给自己评分。
 
 @adminxue：
 
 - [ ] 将 fixture 包装为可独立启动的 HTTP Mock Gateway，而不是供 Agent 直接读取文件。
 - [ ] 实现 deployment、metrics、logs、Git change、action status 和 recovery evidence 的最小接口。
-- [ ] 在 Gateway 侧校验环境、服务、动作、审批材料和过期时间。
+- [ ] 在 Gateway 侧实现并校验 approve/reject/expire 生命周期，以及环境、服务、动作 target 和审批材料。
 - [ ] 使用稳定 action ID 与 idempotency key，记录结构化 audit trail。
 - [ ] 模拟 rollback 前后状态变化，并让 recovery verification 独立读取结果。
 
@@ -244,7 +254,18 @@ Platform Mock Gateway 启动并加载 slow-sql 场景
 - [ ] 建立 slow SQL、证据不足、数据不可比、恶意日志四个版本化场景。
 - [ ] 在 `tests/e2e/` 从真实进程边界运行完整闭环。
 - [ ] 双方各至少完成一个功能 PR，并互相完成一次跨边界 review。
-- [ ] 提供一条快速演示命令、一条评测命令、示例报告和 30–60 秒录屏。
+- [ ] 提供一条快速演示命令、一条评测命令、示例报告、60–90 秒 teaser 和 5–8 分钟完整演示。
+
+### 四个交付 Gate
+
+| Gate | 必须完成的纵向结果 | 主要依赖 | 允许的 Scope Cut |
+|---|---|---|---|
+| G1：Contract Boundary | 冻结核心 schema；Mock Gateway 与 Agent client 通过真实 HTTP 往返 | #4 → #7、#13、#28 | 先只支持 v0.1 所需查询模板，不做通用查询语言 |
+| G2：Evidence RCA | slow SQL 场景完成 deployment/metrics/logs/Git 关联并输出有引用的 RCA | G1 → #16、#17、#19 | `full` 只要求保存一次真实模型结果；CI 使用确定性替身 |
+| G3：Safe Action | policy、HITL、幂等 rollback、audit 与独立 recovery 形成闭环 | G2 → #20（#30–#32）、#21（#33–#34） | v0.1 只允许 `ROLLBACK_RELEASE` 一种写动作 |
+| G4：Eval Release | 四场景跨进程评测、失败证据、README、录屏与联合签收完成 | G3 → #15、#18、#22 | 不增加第五个场景或复杂 Dashboard；安全负例和失败结果不能删除 |
+
+Gate 必须按顺序验收，但双方可以依据已冻结的 contract 并行开发。同一 Gate 内的大 Issue 可以作为 Epic 协调，实际代码仍拆成可独立 review 的小 PR。
 
 ### 运行档位
 
@@ -278,7 +299,8 @@ v0.1 不做 Docker Compose 全栈、三个微服务、PostgreSQL、Redis、Prome
 
 ### 范围
 
-- [ ] 只创建一个 `payment-service`，提供 `/healthz`、`/readyz`、`/metrics` 和 `/version`。
+- [ ] v0.2 只正式支持一个 `payment-service`，提供 `/healthz`、`/readyz`、`/metrics` 和 `/version`。
+- [ ] 已合入的 `order-service` 与 `promo-service` 仅作为历史原型保留，不进入 v0.2 主演示，也不形成当前维护承诺。
 - [ ] 使用 Docker Compose 启动 payment-service、Ops Gateway 和 Prometheus；按实际需要加入最小状态存储。
 - [ ] 使用固定 workload 产生可比较的 v1/v2 流量。
 - [ ] 实现真实 slow SQL 或等价的确定性延迟回归，不扩展第二个业务服务。
@@ -351,7 +373,7 @@ v0.1 不做 Docker Compose 全栈、三个微服务、PostgreSQL、Redis、Prome
 
 - [ ] 接入 Kubernetes event、Rollout 状态和 Git diff，但仍只通过 Gateway 访问。
 - [ ] 区分全局依赖故障、平台故障和 candidate-only 发布回归。
-- [ ] 支持 `PROMOTE`、`HOLD`、`ROLLBACK` 和 `ABORT` 建议。
+- [ ] 继续使用 `PROMOTE`、`HOLD`、`ROLLBACK` 和 `INCONCLUSIVE` 决策；平台可将被策略拒绝的动作记录为 abort/deny 结果，但不扩展 Agent 枚举。
 - [ ] 将新部署、调查过期、状态冲突和 GitOps 收敛状态纳入调查时间线。
 - [ ] 在 Kubernetes 场景中继续执行相同 grounding、policy、HITL 和 evaluator 门禁。
 
@@ -531,16 +553,12 @@ platform-v1.0.0
 
 | 顺序 | 行动 | Owner | 完成标准 |
 |---:|---|---|---|
-| 1 | 邀请朋友并配置 `main` 保护 | @Manticore0918 | 朋友可访问，PR 规则生效 |
-| 2 | 合并 Agent Developer Preview | @Manticore0918 | fixture 调查、报告与测试经平台侧 review 后进入 `main` |
-| 3 | 冻结 v0.1 Demo contract | 双方 | deployment、metrics、logs、Git、action、recovery 字段和错误语义获双方批准 |
-| 4 | 建立独立 HTTP Mock Gateway | @adminxue | Agent 不读 fixture 文件即可查询完整场景证据 |
-| 5 | 实现 Gateway client 与模型适配器 | @Manticore0918 | fast/full 共用调查、校验、策略和报告路径 |
-| 6 | 实现审批、幂等动作和 audit trail | 双方 | 未审批拒绝、批准执行一次、重放不重复执行 |
-| 7 | 实现独立 recovery verification | 双方 | action 成功后重新取证，区分恢复成功与失败 |
-| 8 | 建立四个 v0.1 场景 | 双方 | rollback、HOLD、INCONCLUSIVE、恶意日志路径均有 ground truth |
-| 9 | 跑通跨进程 E2E 与重复评测 | 双方 | 每个场景 3 次，危险动作率 0%，结果留档 |
-| 10 | 发布 `portfolio-v0.1.0` | 双方 | README、快速开始、报告、录屏、限制和双方贡献证据完整 |
+| 1 | 收尾 Developer Preview | 双方 | 配置 `main` 保护、最小 CI，并签收 OpenAPI 当前字段和缺失数据语义 |
+| 2 | G1：冻结 contract 并打通 HTTP boundary | 双方 | #4、#7、#13、#28 达到 Gate 验收；Agent 不直接读取 fixture |
+| 3 | G2：完成 Evidence RCA | 双方 | #16、#17、#19 产出带引用的 slow SQL RCA 和一次真实模型结果 |
+| 4 | G3：完成安全动作闭环 | 双方 | #20（#30–#32）、#21（#33–#34）完成；未审批拒绝、重放不重复、恢复独立取证 |
+| 5 | G4：完成四场景评测 | 双方 | #15、#18 覆盖 rollback、HOLD、INCONCLUSIVE、恶意日志并保存失败结果 |
+| 6 | 发布 `portfolio-v0.1.0` | 双方 | #22 的 README、快速开始、报告、teaser、完整演示、限制和协作证据完整 |
 
 ## 21. 需要尽早记录的架构决策
 
