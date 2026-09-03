@@ -5,10 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "releaseguard-agent"
 version = "0.1.0"
-description = "ReleaseGuard Agent：CP0 契约冒烟测试基线（领域模型 + 确定性 mock 调查）"
+description = "ReleaseGuard Agent Developer Preview：契约冒烟测试基线（领域模型 + 确定性 mock 调查）"
 readme = "README.md"
 requires-python = ">=3.11"
-# CP0 保持轻量：契约冒烟测试只依赖 pydantic，不引入 langgraph / langchain。
+# Developer Preview 保持轻量：契约冒烟测试只依赖 pydantic，不引入 LangGraph / LangChain。
 dependencies = [
   "pydantic>=2.10,<3",
 ]

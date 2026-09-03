@@ -36,19 +36,23 @@ ReleaseGuard 是一个由 AI 辅助的发布风险分析与策略门控处置平
 
 ## 当前阶段
 
-**阶段 0：契约与本地平台骨架**
+**v0.1：联合 Portfolio MVP**
 
-初始共同交付物：
+Agent 侧已经具备基于共享 fixture 的确定性调查种子，可以生成结构化 Evidence、Finding 和 JSON/Markdown 报告。该能力属于 Developer Preview，不单独作为正式作品集版本。
 
-1. 冻结第一版 Agent–Gateway API。
-2. 基于契约测试夹具建立 Agent 服务骨架。
-3. 建立 Docker Compose 平台和 Demo 服务骨架。
-4. 完成一个 slow SQL 发布回归场景的完整闭环。
-5. 重复运行同一场景，并记录成功和失败结果。
+v0.1 将由双方共同交付：
+
+1. 冻结包含部署、指标、日志、Git、动作状态和恢复证据的 Agent–Gateway API。
+2. 平台侧把 fixture 包装为独立 HTTP Mock Gateway，负责审批校验、幂等动作、审计和恢复状态。
+3. Agent 侧只通过 Gateway 完成 slow SQL 发布关联、证据化 RCA、确定性策略和 HITL。
+4. 双方共同覆盖 rollback、`HOLD`、`INCONCLUSIVE` 和恶意日志四个场景，并从真实进程边界运行 E2E。
+5. 每个场景重复运行 3 次，发布快速开始、事故报告、评测结果、录屏和双方 PR/review 证据。
+
+v0.1 不要求 Docker Compose、真实 Prometheus、三微服务或 Kubernetes。后续版本依次增加单服务本地集成、可靠性评测实验室和 Kubernetes/Argo 平台深度。
 
 ## 项目文档
 
-- [项目方向与阶段性 Checkpoint](docs/PROJECT_DIRECTION_AND_CHECKPOINTS.md)
+- [项目方向与版本路线图](docs/PROJECT_DIRECTION_AND_CHECKPOINTS.md)
 - [Agent / AI 工程负责人执行手册](docs/AGENT_ENGINEER_PLAYBOOK.md)
 - [DevOps / Platform 工程负责人执行手册](docs/DEVOPS_PLATFORM_PLAYBOOK.md)
 - [贡献与协作流程](CONTRIBUTING.md)
@@ -61,4 +65,4 @@ ReleaseGuard 是一个由 AI 辅助的发布风险分析与策略门控处置平
 
 ## 当前状态
 
-仓库当前已包含协作骨架、职责文档、项目路线图和第一版 API 契约。应用代码和可部署基础设施将通过双方 Review 的 Pull Request 逐步加入。
+仓库当前已包含协作骨架、第一版 API 契约和 Agent Developer Preview。下一项共同目标是完成独立 HTTP Mock Gateway 与跨进程联合闭环，发布 `portfolio-v0.1.0`；Compose、完整可观测性和 Kubernetes 不再阻塞首个 Portfolio Release。

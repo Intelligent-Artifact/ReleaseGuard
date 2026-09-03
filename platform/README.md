@@ -29,13 +29,18 @@
 每个服务统一提供 `/healthz`、`/readyz`、`/metrics`、`/version`，
 输出结构化 JSON 日志，并生成/传播 W3C `traceparent` 上下文。
 
-## 初始任务
+这些服务是路线调整前已经合入的原型资产。当前只把 `payment-service` 纳入 v0.2 的正式支持范围；
+`order-service` 与 `promo-service` 可以保留用于后续场景，但不构成 v0.1/v0.2 的交付或维护承诺。
 
-1. 建立三个包含健康检查、指标和结构化日志的最小 Demo 服务。
-2. 建立 Docker Compose 开发平台。
-3. 实现部署元数据与指标对比接口。
-4. 增加稳定的 k6 checkout 工作负载。
-5. 实现带 TTL 和清理流程的 slow SQL 场景。
-6. 增加策略门控回滚和恢复验证。
+## 当前任务：v0.1 联合 Portfolio MVP
+
+1. 与 Agent 负责人冻结 deployment、metrics、logs、Git、action 和 recovery 的最小契约。
+2. 将共享 fixture 包装成可独立启动的 HTTP Mock Gateway，确保 Agent 不能直接读取平台 fixture。
+3. 在 Gateway 侧实现审批材料校验、稳定 action ID、idempotency key 和 audit trail。
+4. 模拟 slow SQL 场景的 rollback 前后状态，并通过独立 recovery evidence 验证结果。
+5. 与 Agent 侧共同覆盖 rollback、`HOLD`、`INCONCLUSIVE` 和恶意日志四条跨进程 E2E 路径。
+6. 完成双方功能 PR、跨边界 review、重复评测和联合演示后发布 `portfolio-v0.1.0`。
+
+Docker Compose、真实 Prometheus 和业务服务从 v0.2 开始；Kubernetes、Helm 与 Argo 从 v1.0 开始，不阻塞 v0.1。
 
 完整计划参见 [DevOps / Platform 工程负责人执行手册](../docs/DEVOPS_PLATFORM_PLAYBOOK.md)。
