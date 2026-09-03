@@ -7,10 +7,10 @@ ReleaseGuard 是一个面向渐进式发布的 AI 辅助可靠性平台。Agent 
 **Agent 不直接访问 Kubernetes 或执行任意命令**，只能通过 `../contracts/openapi.yaml`
 定义的版本化契约读取数据。
 
-> 当前目录处于 **CP0：协作与契约基线** 阶段。它交付一份可复现的
-> **Agent 契约冒烟测试**——在没有真实基础设施、没有 LLM、没有 langgraph 的前提下，
+> 当前目录交付 **Agent Developer Preview**。它提供一份可复现的
+> **Agent 契约冒烟测试**——在没有真实基础设施、没有 LLM、没有 LangGraph 的前提下，
 > 读取共享契约 fixture，完成一次确定性 mock 调查，并输出区分事实/推断/建议的报告。
-> 后续 Checkpoint（CP1+）的 LangGraph 调查引擎将在此领域模型之上扩展。
+> Developer Preview 只作为开发基础，不单独构成正式作品集版本；v0.1 必须通过独立 HTTP Mock Gateway 与平台侧形成联合闭环。
 
 ## 本目录能做什么
 
@@ -21,7 +21,7 @@ ReleaseGuard 是一个面向渐进式发布的 AI 辅助可靠性平台。Agent 
 2. **跑一次确定性 mock 调查**：把 fixture 转成结构化 `Evidence`，
    按固定规则判断回归、形成 `Finding`，并裁决处置方向；
 3. **生成事故报告**：机器可读 JSON + 人可读 Markdown，严格区分事实 / 推断 / 建议；
-4. **输出冒烟验收证据**：stdout 打印 PASS / 判定结果，可作为 CP0 验收证据留档。
+4. **输出冒烟验收证据**：stdout 打印 PASS / 判定结果，可作为 Developer Preview 验收证据留档。
 
 ## 快速开始
 
@@ -95,7 +95,7 @@ agent/
 - 主流程对当前共享 fixture 的判定为 `HOLD`；`ROLLBACK_RELEASE` 路径由单元测试
   构造完整证据（deployment+metrics+git）覆盖，并验证其符合写契约 `RollbackRequest` 形状。
 
-## CP0 退出条件对照
+## Developer Preview 退出条件对照
 
 - [x] Agent 能根据 fixture 生成一次模拟调查结果（`releaseguard-smoke`）；
 - [x] Agent 契约冒烟测试输出可复现（确定性、无随机、无网络）；
@@ -103,5 +103,5 @@ agent/
 - [ ] 与平台侧共同 review OpenAPI v0.1，并让平台侧的契约冒烟测试并行通过；
 - [ ] 双方各一个合并 PR（本目录通过 PR 合入 `main`）。
 
-详细路线见 [`../docs/PROJECT_DIRECTION_AND_CHECKPOINTS.md`](../docs/PROJECT_DIRECTION_AND_CHECKPOINTS.md)
+详细版本路线见 [`../docs/PROJECT_DIRECTION_AND_CHECKPOINTS.md`](../docs/PROJECT_DIRECTION_AND_CHECKPOINTS.md)
 与 [`../docs/AGENT_ENGINEER_PLAYBOOK.md`](../docs/AGENT_ENGINEER_PLAYBOOK.md)。

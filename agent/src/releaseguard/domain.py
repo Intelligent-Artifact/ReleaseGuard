@@ -1,10 +1,10 @@
-"""Agent 领域模型（CP0 种子版）。
+"""Agent 领域模型（Developer Preview 种子版）。
 
 定义 Investigation / Evidence / Finding / ActionProposal / IncidentReport 五类
 核心对象。它们与 `contracts.py` 里的“线上契约报文”不同：contracts 描述 Agent 与
 Ops Gateway 之间传输的原始报文；domain 描述 Agent 自身调查与推理得到的结构化结果。
 
-CP1 的完整引擎将在此模型之上扩展状态机、持久化与报告；CP0 阶段只落基础 schema，
+v0.1 的联合引擎将在此模型之上扩展 HTTP Gateway、状态机与报告；Developer Preview 只落基础 schema，
 并用确定性 mock 调查把它们串成一次可复现的冒烟结果。
 """
 

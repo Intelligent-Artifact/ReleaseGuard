@@ -94,7 +94,7 @@ class TestRollback请求契约语义:
 
 class Test契约底层语义约束:
     def test_无时区时间被拒绝(self, bundle):
-        """CP0 明确时间格式：比较时间必须带时区。"""
+        """Developer Preview 明确时间格式：比较时间必须带时区。"""
         payload = bundle.metrics.model_dump()
         payload["generated_at"] = "2026-09-02T14:36:30"  # 去掉 Z，变成 naive
         with pytest.raises(ValidationError):

@@ -1,11 +1,11 @@
-"""Ops Gateway 契约客户端（CP0：仅读取共享 fixture）。
+"""Ops Gateway 契约客户端（Developer Preview：仅读取共享 fixture）。
 
 `contracts/openapi.yaml` 是 Agent 与 Ops Gateway 之间的唯一事实来源。本模块
 用 Pydantic 模型镜像 OpenAPI v0.1 中 Agent 真正消费/产生的报文结构，用于：
 
 - 读取并校验共享测试夹具 `contracts/examples/*.json`；
 - 语义校验：必填字段、枚举、service 命名、时间格式与错误码；
-- 在后续 CP1 接入真实 Gateway 时，作为响应结构校验与稳定错误码判断的依据。
+- 在 v0.1 接入独立 HTTP Mock Gateway 时，作为响应结构校验与稳定错误码判断的依据。
 
 本文件只描述“线上契约”，不包含任何 Agent 调查逻辑。Agent 调查逻辑见 domain.py 与 smoke.py。
 """
@@ -23,7 +23,7 @@ from typing import Annotated, Literal
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 # ---------------------------------------------------------------------------
-# 通用类型：时间必须携带时区（RFC3339 / ISO8601）。这是双方在 CP0 需要明确的
+# 通用类型：时间必须携带时区（RFC3339 / ISO8601）。这是双方在 Developer Preview 需要明确的
 # “时间格式”语义：禁止把无时区的本地时间当作可比较时间。
 # ---------------------------------------------------------------------------
 
@@ -81,7 +81,7 @@ class ErrorCode(str, Enum):
     VERIFICATION_FAILED = "VERIFICATION_FAILED"
 
 
-# openapi 里 RollbackRequest.risk 当前只允许 MEDIUM（CP0 阶段尚未放开其他风险）。
+# OpenAPI 里 RollbackRequest.risk 当前只允许 MEDIUM（Developer Preview 尚未放开其他风险）。
 RollbackRisk = Literal["MEDIUM"]
 
 
@@ -181,7 +181,7 @@ class RollbackRequest(BaseModel):
     """POST /api/v1/actions/rollback 的请求体（镜像 openapi.yaml）。
 
     Agent 只有在政策判定为允许、需要审批的动作获得批准后，才会构造并提交
-    该报文；CP0 阶段只校验其契约形状，不真正提交给 Gateway。
+    该报文；Developer Preview 只校验其契约形状，不真正提交给 Gateway。
     """
 
     model_config = ConfigDict(extra="forbid")

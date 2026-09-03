@@ -129,17 +129,17 @@ platform/
 ├── load/
 │   ├── k6/
 │   └── profiles/
-├── terraform/             # Phase 4 再引入
+├── terraform/             # v1.x 再引入
 ├── ci/
 ├── scripts/
 └── runbooks/
 ```
 
-V1 可以直接在仓库根目录使用更少的目录，但 ownership 和依赖方向要保持一致。
+v0.1 可以直接在仓库根目录使用更少的目录，只需要 Mock Gateway、fixture 状态和测试；ownership 和依赖方向仍要保持一致。
 
 ## 5. Demo Application 设计
 
-建议使用一个最小电商链路：
+v0.2 只实现 `payment-service`。下面的最小电商链路是 v0.3/v1.0 的扩展方向，不是 v0.1 或 v0.2 的退出条件：
 
 ```text
 client / k6
@@ -150,7 +150,7 @@ client / k6
         → Redis
 ```
 
-### 5.1 每个服务必须提供
+### 5.1 每个已实现服务必须提供
 
 - `GET /healthz`：进程是否存活，不检查所有下游。
 - `GET /readyz`：是否可以接收流量，检查必要依赖。
@@ -177,30 +177,30 @@ client / k6
 
 不要把 user ID、订单号、完整 URL、异常堆栈等高基数字段放进 metric labels。
 
-### 5.3 需要采集的最小指标
+### 5.3 按版本采集的指标
 
 - 请求数：按 service、version、route、status class。
 - 错误率：5xx 和业务失败分别统计。
 - 延迟 histogram：p50、p95、p99 可计算。
 - active requests 和 queue depth。
 - CPU、内存和重启次数。
-- PostgreSQL 查询耗时、连接池已用连接数和等待数。
-- Redis error、latency 和 connection 状态。
+- 使用 PostgreSQL 的场景再采集查询耗时、连接池已用连接数和等待数。
+- 使用 Redis 的场景再采集 error、latency 和 connection 状态。
 - rollout 当前权重和 replica 状态。
 
-## 6. Docker Compose 最小可行版本
+## 6. v0.2 Docker Compose 最小可行版本
 
 ### 6.1 服务范围
 
-V1 的 Compose 至少包含：
+v0.2 的 Compose 只要求：
 
-- order-service、payment-service、promo-service；
-- PostgreSQL、Redis；
+- payment-service；
 - Ops Gateway；
-- Agent API；
-- Prometheus、Grafana、Loki；
-- 日志采集组件；
-- k6 runner 或可单独启动的 workload profile。
+- Prometheus；
+- Agent API 或可从宿主机调用的 Agent CLI；
+- k6 runner 或等价的固定 workload profile。
+
+PostgreSQL、Redis、Grafana、Loki 和日志采集组件按 v0.3 场景需要再加入；不得为了凑技术栈提前引入。
 
 ### 6.2 Compose 工程要求
 
@@ -215,14 +215,14 @@ V1 的 Compose 至少包含：
 - 网络至少区分 app、observability、control；Agent 不应直连所有容器。
 - 一条命令能启动，一条命令能验证，一条命令能停止并保留或清理指定数据。
 
-### 6.3 MVP 验收
+### 6.3 v0.2 验收
 
 ```text
 docker compose up
     → 所有依赖通过 health check
     → k6 产生稳定流量
     → Prometheus 能按 version 比较指标
-    → Loki 能按 service/version 查询日志
+    → Gateway 能返回带稳定 source reference 的结构化日志证据
     → Gateway 返回统一部署元数据
     → 故障注入后能形成可观察回归
     → 清理后环境恢复 baseline
@@ -232,7 +232,7 @@ docker compose up
 
 ## 7. Kubernetes、Helm 与 GitOps
 
-Phase 2 再迁移到 Kubernetes。建议顺序：
+v1.0 再迁移到 Kubernetes。建议顺序：
 
 1. 先把 Compose 中的 health、config、telemetry 和 fault scenario 稳定下来。
 2. 使用 Helm chart 管理公共模板和环境 values。
@@ -290,7 +290,9 @@ Demo 中需要支持：
 - `PROMOTE`：指标正常，继续发布。
 - `HOLD`：证据不足或遥测不可用，冻结当前权重。
 - `ROLLBACK`：确认 candidate 引入回归，恢复稳定版本。
-- `ABORT`：发布流程异常或违反策略，终止 rollout。
+- `INCONCLUSIVE`：证据缺失、冲突或不可比较，禁止自动改变发布状态。
+
+以上四项是 Agent 的标准 `Decision`。平台控制器仍可产生 abort/deny 操作结果，但它属于策略或执行状态；只有获准的 `ROLLBACK` 才能转换为 `ActionType=ROLLBACK_RELEASE`。
 
 ### 8.1 Analysis 指标
 
@@ -349,7 +351,7 @@ service:availability_5m{service,version,environment}
 
 ### 9.3 链路 / OpenTelemetry
 
-Phase 3 接入，但应用从 V1 开始传播 trace context，避免后期重构。
+v0.3 接入，但 payment-service 从 v0.2 开始传播 trace context，避免后期重构。
 
 - 统一服务资源属性。
 - HTTP、数据库、Redis 调用建立 span。
@@ -399,7 +401,7 @@ GET  /api/v1/actions/{action_id}
 POST /api/v1/actions/{action_id}/verify
 ```
 
-V1–V3 只开放少量动作：
+v0.1–v1.0 只开放少量动作：
 
 - pause / hold rollout；
 - rollback 到明确版本或 revision；
@@ -687,52 +689,55 @@ limits:
 
 ## 16. 分阶段交付计划
 
-### 阶段 0：契约和本地底座（0.5–1 天）
+### Developer Preview：契约协作基线
 
-- [ ] 与 Agent 负责人确定 service/version/deployment/commit 字段。
-- [ ] 共同完成 OpenAPI 初稿、示例响应和错误码。
-- [ ] 创建三个 demo service 的最小健康端点与 telemetry。
-- [ ] 创建 Compose 骨架、PostgreSQL、Redis 和 Gateway mock。
-- [ ] 建立平台 CI。
+- [ ] 与 Agent 负责人确认 service/version/deployment/commit 字段、时间格式和错误码。
+- [x] 已通过 PR #2 review Agent fixture 调查的契约用法、空值语义和动作边界，并完成干净环境复验。
+- [x] 已通过 PR #1 验证平台侧分支、Agent review 与 merge 流程。
 
-完成标准：Agent 可用 fixture 开发；平台可独立启动并返回稳定的部署元数据。
+完成标准：双方批准当前契约语义，Agent Developer Preview 可以合并；此阶段不要求 Compose 或真实服务。
 
-### 阶段 1：Docker Compose MVP（约 1 周）
+### v0.1：联合 Portfolio MVP（7–12 个有效开发日）
 
-- [ ] 所有服务、数据库、缓存、Prometheus、Grafana、Loki 一键启动。
-- [ ] k6 生成稳定流量并区分 v1/v2。
-- [ ] Gateway 提供部署、metrics、logs 查询。
-- [ ] 支持 slow SQL、memory leak、bad config 三个场景。
-- [ ] 每个场景有注入、验证、TTL 和清理。
-- [ ] 建立 release、service SLO 和 incident dashboard。
-- [ ] 与 Agent 跑通 RCA 端到端演示。
+- [ ] G1：将共享 fixture 包装成独立 HTTP Mock Gateway，提供最小只读 Evidence 接口，并与 Agent client 通过 contract tests。
+- [ ] G2：为 slow SQL 场景提供 deployment、metrics、logs、Git change 的版本化状态，支持有引用的 RCA。
+- [ ] G3：实现 approval 生命周期、稳定 action ID、idempotency key、audit trail 和独立 recovery evidence。
+- [ ] G4：补齐证据不足、数据不可比和恶意日志场景，与 Agent 负责人完成跨进程 E2E、重复评测和演示材料。
 
-完成标准：全新机器按 README 可启动 demo、注入故障、看到回归、完成清理；连续运行 3 次结果一致。
+完成标准：未审批写操作被拒绝，批准后的 rollback 只执行一次，恢复成功与失败均可验证；双方各有功能 PR 和跨边界 review。
 
-### 阶段 2：Kubernetes / GitOps
+### v0.2：Local Integration
 
-- [ ] Helm chart、demo namespace 和最小 RBAC。
-- [ ] GitHub Actions 构建不可变镜像。
-- [ ] Argo CD 管理期望状态。
-- [ ] Argo Rollouts 实现 canary、hold、promote、rollback。
-- [ ] Gateway 读取 Kubernetes events 和 rollout metadata。
-- [ ] 中风险动作审批后执行，审计完整。
+- [ ] 只把 `payment-service` 纳入正式支持，统一 health、metrics、结构化日志和版本信息。
+- [ ] 已合入的 `order-service`、`promo-service` 作为历史原型保留，不进入 v0.2 主演示，也不形成当前维护承诺。
+- [ ] 用 Compose 启动 payment-service、Ops Gateway 和 Prometheus；状态存储按实际需要保持最小。
+- [ ] 建立稳定 workload 和真实 slow SQL 回归，能够区分 v1/v2。
+- [ ] 保持 v0.1 OpenAPI 不变，把 Mock Gateway 数据源替换为真实本地组件。
+- [ ] 实现启动、验证、停止和幂等清理，连续运行 3 次。
+
+完成标准：全新机器按 README 可以启动单服务最小栈、观察 candidate-only 回归、受控 rollback 并验证恢复。
+
+### v0.3：Reliability Lab
+
+- [ ] 按场景需要加入 Loki、OpenTelemetry/Tempo、持久 action/checkpoint 存储和评测指标。
+- [ ] 将场景逐步扩展到 5–10 个，每个场景有注入、验证、TTL、cleanup 和 ground truth。
+- [ ] 覆盖 Gateway 重启、遥测延迟/缺失、动作超时和 cleanup 失败。
+- [ ] 建立同时展示成功、失败和不确定结果的 eval dashboard。
+
+完成标准：平台不再只证明 happy path，而能稳定支持重复事故实验和失败恢复。
+
+### v1.0：Platform Edition
+
+- [ ] 创建 Helm chart、demo namespace、最小 RBAC 和 NetworkPolicy。
+- [ ] 使用 GitHub Actions 构建不可变镜像，Argo CD 管理期望状态。
+- [ ] 使用 Argo Rollouts 实现 canary、hold、promote 和 rollback。
+- [ ] Gateway 读取 Kubernetes events、rollout metadata 和 GitOps 收敛状态。
 - [ ] 恢复验证包含 rollout、health、SLO 和最小流量。
+- [ ] 完成平台重建、故障清理、备份恢复和 GitOps drift Runbook。
 
 完成标准：candidate 发生回归后可以受控 rollback，Git 与运行状态最终一致，Agent 无集群直连权限。
 
-### 阶段 3：作品集版本
-
-- [ ] OpenTelemetry + Tempo 全链路追踪。
-- [ ] 10 个以上故障场景和多种 workload。
-- [ ] Eval dashboard 展示成功和失败结果。
-- [ ] NetworkPolicy、RBAC 和对抗性安全测试。
-- [ ] 平台重建、备份/恢复和故障清理 runbook。
-- [ ] 架构图、ADR、操作手册、演示视频和个人贡献说明。
-
-完成标准：项目展示的是可靠交付平台，而非只在本地跑通的一次性 demo。
-
-### 阶段 4：有余力再做
+### v1.x：有余力再做
 
 - Terraform 部署云环境；
 - Chaos Mesh；
@@ -745,20 +750,18 @@ limits:
 
 | 优先级 | Issue | 输出 |
 |---|---|---|
-| P0 | 定义 Agent–Gateway OpenAPI v1 | OpenAPI、测试夹具、错误码 |
-| P0 | 建立 Demo 服务骨架 | 健康检查、指标、结构化日志 |
-| P0 | 增加 Compose 平台 | 一键启动、健康检查、网络、数据卷 |
-| P0 | 增加部署元数据 API | 版本、commit、时间戳、状态 |
-| P0 | 增加模板化指标对比 API | baseline/candidate 对比 |
-| P1 | 增加 Loki 与日志 API | JSON 日志、聚合、引用 |
-| P1 | 增加 k6 checkout 配置 | 稳定工作负载、结果报告 |
-| P1 | 增加 slow SQL 场景 | 注入、验证、清理、ground truth |
-| P1 | 增加 Gateway 策略与审计 | allowlist、审批、审计 |
-| P1 | 增加恢复验证 | 健康状态、SLO、rollout |
-| P2 | 增加 Helm 与 Argo CD | GitOps 部署 |
-| P2 | 增加 Argo Rollouts canary | hold、promote、rollback |
-| P2 | 增加 OpenTelemetry / Tempo | 链路与日志关联 |
-| P2 | 增加安全测试集 | RBAC、重放、注入 |
+| P0 | review Agent Developer Preview | 契约语义、空值、动作边界审查记录 |
+| P0 | 冻结 v0.1 Demo contract | OpenAPI、正常/失败 fixture、稳定错误码 |
+| P0 | 建立 HTTP Mock Gateway | 独立进程、健康检查、fixture 状态加载 |
+| P0 | 增加最小只读证据 API | deployment、metrics、logs、Git change |
+| P0 | 增加受控 action API | 审批校验、action ID、幂等、状态轮询 |
+| P0 | 增加 recovery evidence | rollback 前后状态、独立恢复结论 |
+| P0 | 建立四个 v0.1 场景 | rollback、HOLD、INCONCLUSIVE、恶意日志 |
+| P0 | 完成联合 E2E 与审计展示 | 跨进程测试、重复运行、audit trail |
+| P1 | 建立单个 Demo 服务与 Compose | payment-service、Gateway、Prometheus |
+| P1 | 增加真实 workload 与 slow SQL | 可比较 v1/v2 流量、注入和清理 |
+| P2 | 增加 Loki/OpenTelemetry 与实验室 | 5–10 场景、多源证据、评测看板 |
+| P3 | 增加 Helm、Argo CD/Rollouts | GitOps canary、RBAC、恢复验证 |
 
 每个 issue 写清 owner、依赖、接口变化、验收命令、失败清理方式和需要 Agent 配合的内容。
 
@@ -805,25 +808,35 @@ limits:
 
 ## 19. 你的完成定义
 
-一个平台功能同时满足以下条件才算完成：
+一个平台功能只有满足当前版本声明的适用条件才算完成；契约、安全、幂等、审计和恢复验证在所有版本都不能省略。
 
 - [ ] 配置和基础设施代码已入库，可从干净环境重建。
 - [ ] 健康检查、超时、重试和资源限制合理。
-- [ ] 镜像可追溯到 digest 和 commit SHA。
-- [ ] metrics、logs、traces 和部署元数据使用统一标签。
+- [ ] v0.2 及以后使用的镜像可追溯到 digest 和 commit SHA。
+- [ ] 当前版本提供的 metrics、logs、traces 和部署元数据使用统一标签与来源引用。
 - [ ] Gateway 请求/响应符合 OpenAPI 和错误契约。
-- [ ] 只读与写权限分离，动作受 allowlist 和 RBAC 限制。
+- [ ] 只读与写权限分离，动作受 allowlist 限制；v1.0 再由 Kubernetes RBAC 强制执行。
 - [ ] 需要审批的动作无法绕过审批。
-- [ ] 动作幂等并有持久状态、审计和 correlation ID。
+- [ ] v0.1 动作状态在场景生命周期内可审计且幂等；v0.2 及以后增加持久状态和 correlation ID。
 - [ ] 有正常、超时、无数据、权限不足和执行失败测试。
-- [ ] 故障注入有前置检查、TTL、验证和幂等清理。
-- [ ] 恢复验证检查真实 SLO 和最小样本量。
-- [ ] README、runbook、dashboard 和契约已更新。
-- [ ] 至少一个真实端到端场景通过，失败路径也验证过。
+- [ ] v0.1 fixture 可重复初始化；v0.2 及以后的真实故障注入有前置检查、TTL、验证和幂等清理。
+- [ ] v0.1 按版本化 recovery fixture 验证；v0.2 及以后检查真实 SLO 和最小样本量。
+- [ ] README、当前版本要求的 runbook/报告和契约已更新；Dashboard 从 v0.3 开始要求。
+- [ ] 至少一个当前版本声明的端到端场景通过；v0.1 必须跨真实 HTTP 进程边界，失败路径也必须验证。
 
 ## 20. 演示运行手册
 
-建议把平台演示控制在 6–8 分钟：
+v0.1 建议把平台演示控制在 3–5 分钟：
+
+1. 独立启动 HTTP Mock Gateway，并展示当前 slow SQL 场景与健康状态。
+2. 展示 Agent 只能通过 Gateway 获取 v1/v2 部署、指标、日志和 Git 证据。
+3. 展示未审批 rollback 被 Gateway 拒绝。
+4. 批准后展示稳定 action ID、idempotency key 和 audit trail。
+5. 重放相同请求，证明 rollback 不会执行第二次。
+6. 展示 recovery evidence，以及恢复成功和失败如何被区分。
+7. 展示双方功能 PR、跨边界 review 和联合 E2E 结果。
+
+v1.0 完整平台演示再扩展为 6–8 分钟：
 
 1. 展示 CI 产出的 v2 镜像 digest 与 commit SHA。
 2. 展示 Argo Rollouts 将 v2 以 10% canary 发布。
@@ -857,9 +870,9 @@ limits:
 
 ## 22. 明确不做的事
 
-- V1 不上云，不先做 Terraform。
-- V1 不引入完整 service mesh。
-- V1 不开放通用 Kubernetes 操作 API。
+- v1.0 不上云，不先做 Terraform。
+- v1.0 不引入完整 service mesh。
+- v1.0 不开放通用 Kubernetes 操作 API。
 - 不给 Agent cluster-admin 或长期云凭据。
 - 不在 CI 中直接修改集群并绕过 GitOps。
 - 不用 restart policy 和无限重试掩盖真实故障。
@@ -870,15 +883,14 @@ limits:
 
 ## 23. 你现在可以立即开始的顺序
 
-1. 与 Agent 负责人冻结 service/version/deployment/commit 公共字段和 OpenAPI。
-2. 创建三个最小 demo service，统一 health、metrics、JSON logs 和 trace context。
-3. 用 Compose 接入 PostgreSQL、Redis、Prometheus、Grafana、Loki 和 Gateway。
-4. 建立固定的 k6 checkout workload，获得稳定 baseline。
-5. 实现 deployment metadata 与 metrics compare 两个 Gateway 接口。
-6. 完成 slow SQL 场景的 inject、verify、TTL、cleanup 和 ground truth。
-7. 与 Agent 跑通只读 RCA，再加入 policy、审批和 rollback。
-8. 加入恢复验证和审计，重复运行同一场景 3 次。
-9. Compose 稳定后再迁移 Helm、Argo CD 和 Argo Rollouts。
-10. 最后扩展 traces、10 个场景、eval dashboard 和云部署。
+1. review Agent Developer Preview，并与 Agent 负责人冻结 v0.1 OpenAPI 和场景语义。
+2. 将共享 fixture 包装为独立 HTTP Mock Gateway，先实现健康检查和只读证据接口。
+3. 增加 approval 校验、action status、idempotency 和 audit trail。
+4. 增加独立 recovery evidence，覆盖恢复成功与失败。
+5. 与 Agent 跑通 slow SQL、`HOLD`、`INCONCLUSIVE` 和恶意日志四条路径。
+6. 每个场景重复运行 3 次，完成联合 E2E、README、报告和录屏。
+7. 发布 `portfolio-v0.1.0` 后，只把 payment-service 纳入正式支持并建立最小 Compose/Prometheus 栈；其余已合入原型不进入主演示。
+8. v0.2 稳定后再扩展 Loki、traces、5–10 个场景和 eval dashboard。
+9. 最后迁移 Helm、Argo CD 和 Argo Rollouts，形成 v1.0 Platform Edition。
 
 如果时间紧，优先保证“可重复发布 + 可比较遥测 + 受控动作 API + 幂等回滚 + 独立恢复验证 + 安全故障注入”这六件事。它们最能证明你的 DevOps / Platform / SRE 能力。

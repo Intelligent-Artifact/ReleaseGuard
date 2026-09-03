@@ -23,7 +23,7 @@
 - 同一个事故可以重复运行和评分；
 - 高风险操作不会被模型越权执行；
 - 发布、诊断、审批、处置、验证全程有状态和审计记录；
-- 在 10 个以上故障场景中能报告 RCA 准确率、处置正确率、恢复成功率、危险操作率、诊断耗时和 MTTR。
+- 在 v0.3 及后续版本逐步扩展到 10 个以上故障场景，并报告 RCA 准确率、处置正确率、恢复成功率、危险操作率、诊断耗时和 MTTR。
 
 ## 2. Ownership：你拥有和不拥有的部分
 
@@ -123,7 +123,7 @@ agent/
     └── eval/
 ```
 
-不要一开始拆成很多独立服务。V1 可以只有一个 Agent API 进程和一个数据库；模块边界清楚即可。
+不要一开始拆成很多独立服务。v0.1 可以只有一个 Agent 进程，通过 HTTP 连接 Mock Gateway；模块边界清楚即可。
 
 ## 5. 核心领域模型
 
@@ -273,7 +273,7 @@ DETECTED
 - 参数使用 Pydantic / JSON Schema 严格校验。
 - environment、namespace、service 和 action 必须来自 allowlist。
 - 查询必须有最大时间窗、最大结果数和超时。
-- 模型不能提交原始 PromQL、LogQL 或 shell；V1 使用固定模板加参数。
+- 模型不能提交原始 PromQL、LogQL 或 shell；v0.1 起始终使用固定模板加参数。
 - 工具结果保留来源、查询时间、查询 ID 和原始数据引用。
 - 大结果先聚合，再向 LLM 提供摘要；原始结果单独存储。
 - 工具失败要区分超时、无数据、权限不足和服务错误。
@@ -341,7 +341,7 @@ Agent 不根据错误文本做逻辑判断，只根据稳定的错误码。
 
 ## 9. 调查与关联逻辑
 
-V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
+v0.1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 
 1. 获取部署上下文，确认 baseline、candidate、发布时间和 commit 范围。
 2. 以发布时间为中心建立 before / after 时间窗。
@@ -392,7 +392,7 @@ V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 | READ_ONLY | 查询 metrics、logs、traces、部署状态 | 自动允许 |
 | LOW | 重启一个已被控制器管理且无流量的异常副本 | 策略允许后自动或快速批准 |
 | MEDIUM | rollback deployment、暂停 canary、恢复上一镜像 | 必须人工批准 |
-| HIGH | 数据库迁移回滚、删除持久卷、修改网络策略、跨 namespace 操作 | V1–V3 直接禁止 |
+| HIGH | 数据库迁移回滚、删除持久卷、修改网络策略、跨 namespace 操作 | v0.1–v1.0 直接禁止 |
 
 实现要求：
 
@@ -485,52 +485,55 @@ V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 
 ## 14. 分阶段交付计划
 
-### 阶段 0：契约和骨架（0.5–1 天）
+### Developer Preview：Agent 契约与调查种子
 
-- [ ] 与朋友确认公共命名、版本标签、时间格式和错误码。
-- [ ] 写出 OpenAPI 初稿和示例 fixture。
-- [ ] 建立 Agent API、状态机、Evidence 模型和 mock Gateway。
-- [ ] 建立基础 CI：lint、type check、unit test、contract test。
+- [x] 建立 Investigation、Evidence、Finding、ActionProposal 与 IncidentReport 模型。
+- [x] 用共享 fixture 跑通确定性调查、保守裁决和 JSON/Markdown 报告。
+- [x] 覆盖正常回归、证据缺失、不可比较数据和回滚契约测试。
+- [x] PR #2 已通过平台负责人 review、干净环境复验并合并到 `main`。
+- [ ] 与平台负责人完成 OpenAPI 字段、缺失数据和指标方向语义的联合签收。
 
-完成标准：Agent 在没有真实基础设施时，也能基于 fixture 跑完一次模拟调查并生成报告。
+完成标准：Agent 能独立验证契约和调查语义，但此版本只作为开发基础，不作为正式 Portfolio Release。
 
-### 阶段 1：Docker Compose MVP（约 1 周）
+### v0.1：联合 Portfolio MVP（7–12 个有效开发日）
 
-- [ ] 接入部署元数据、Prometheus 和 Loki。
-- [ ] 支持 3 个场景：慢 SQL、内存泄漏、错误环境变量。
-- [ ] 完成 baseline / candidate 对比和发布关联。
-- [ ] 输出结构化 RootCauseFinding。
-- [ ] 支持 `HOLD` 与 `ROLLBACK_RELEASE` 建议。
-- [ ] 完成审批状态和 incident report。
-- [ ] 运行端到端 demo，至少连续成功 3 次。
+- [ ] G1：通过独立 HTTP Mock Gateway 获取 deployment、metrics、logs 和 Git Evidence；实现指标方向语义，运行时不直接读取平台 fixture。
+- [ ] G2：完成 baseline/candidate 关联、结构化 RCA、替代假设和 evidence ID 校验；fast/full 共用同一调查路径。
+- [ ] G3：实现确定性 policy、action polling 和 recovery classification；审批凭据与动作执行留在 Gateway。
+- [ ] G4：建立 rollback、`HOLD`、`INCONCLUSIVE`、恶意日志四个场景的外部 evaluator，并生成报告和演示材料。
 
-完成标准：从注入故障到得到带证据 RCA 的全过程可重复，Agent 不需要直接进入容器或执行 shell。
+完成标准：双方通过真实 HTTP 边界完成一个 slow SQL 发布回归闭环；四个场景各重复 3 次，危险动作率为 0%，双方各有功能 PR 和跨边界 review。
 
-### 阶段 2：Kubernetes 与渐进式交付
+### v0.2：Local Integration
 
-- [ ] 接入 Kubernetes events 和 Argo Rollouts 状态。
-- [ ] 支持发布感知 RCA。
-- [ ] 接入 Git diff 和 commit metadata。
-- [ ] 增加 Grafana 展示需要的调查/eval metrics。
-- [ ] 完成实际审批后的 rollback 与恢复验证。
-- [ ] 将场景扩展至 6 个以上。
+- [ ] 保持 v0.1 工具协议不变，把 Gateway 数据源替换为单个 payment-service、真实部署状态和 Prometheus。
+- [ ] 接入稳定 workload 与真实 slow SQL 回归。
+- [ ] 覆盖 Gateway 超时、遥测缺失、动作失败和环境清理。
+- [ ] 保留 v0.1 fixture suite 作为快速回归测试。
 
-完成标准：canary 出现回归后，能够安全暂停或 rollback，并证明稳定版本恢复 SLO。
+完成标准：Agent 不接触容器、Prometheus 或 shell，也能通过 Gateway 完成真实本地系统的调查、处置和恢复验证。
 
-### 阶段 3：作品集版本
+### v0.3：Reliability Lab
 
-- [ ] 接入 OpenTelemetry traces。
-- [ ] 完成 10 个以上可重复场景。
-- [ ] 输出 RCA、处置、安全、时延和成本 dashboard。
-- [ ] 加入 prompt injection 与越权测试。
-- [ ] 保存完整推理/工具调用轨迹的安全摘要。
-- [ ] 完成架构文档、ADR、演示视频和个人贡献说明。
+- [ ] 按场景需要接入 logs、traces、持久化 checkpoint 和审计存储。
+- [ ] 将场景扩展到 5–10 个并增加重复试验、失败分类和量化看板。
+- [ ] 保存模型、prompt、tool schema、代码和场景版本，支持可比实验。
+- [ ] 加强 prompt injection、审批重放、状态冲突和恢复失败测试。
 
-完成标准：陌生人按照 README 可在本地运行核心 demo，并能看到成功与失败场景，而不是只看到预录结果。
+完成标准：ReleaseGuard 成为可重复比较 Agent 质量和平台恢复能力的评测系统，而不是一次性 demo。
 
-### 阶段 4：有余力再做
+### v1.0：Platform Edition
 
-- 历史 incident memory；
+- [ ] 通过 Gateway 接入 Kubernetes events、Argo Rollouts 状态、Git diff 和 GitOps 收敛信息。
+- [ ] 区分 candidate-only 回归、全局依赖故障和平台故障。
+- [ ] 继续使用 `PROMOTE`、`HOLD`、`ROLLBACK` 和 `INCONCLUSIVE` 决策；平台 abort/deny 只作为执行结果，不进入 Agent 决策枚举。
+- [ ] 在 Kubernetes 场景中继续执行同一套 grounding、policy、HITL 和 evaluator 门禁。
+
+完成标准：canary 出现回归后能够安全暂停或 rollback，证明稳定版本恢复 SLO，并保持 Agent 无集群直连权限。
+
+### v1.x：有余力再做
+
+- 历史事故检索，但不建设通用长期记忆；
 - SLO / 错误预算决策；
 - 多云部署和 Terraform；
 - Chaos Mesh；
@@ -541,19 +544,18 @@ V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 
 | 优先级 | Issue | 输出 |
 |---|---|---|
-| P0 | 定义 Agent–Gateway OpenAPI v1 | OpenAPI、测试夹具、错误码 |
-| P0 | 增加调查状态机 | 持久化状态、转换测试 |
-| P0 | 定义 Evidence 和 Finding Schema | JSON Schema、校验器 |
-| P0 | 实现部署与指标工具 | 客户端、mock、超时处理 |
-| P0 | 实现发布关联 | baseline/candidate 比较 |
-| P1 | 增加日志调查工具 | 聚合、引用、过滤 |
-| P1 | 增加确定性风险策略 | 规则、决策、测试 |
-| P1 | 增加审批生命周期 | 批准、拒绝、过期、审计 |
-| P1 | 生成事故报告 | JSON + Markdown |
-| P1 | 实现评测运行器和评分器 | 单场景运行、指标 |
-| P2 | 增加链路与 Git diff 关联 | 多源 RCA |
-| P2 | 发布评测指标 | Grafana / JSON 导出 |
-| P2 | 增加提示词注入安全测试集 | 对抗性测试夹具 |
+| P0 | 收尾 Developer Preview | OpenAPI 联合签收、指标方向语义、最小 CI |
+| P0 | 冻结 v0.1 Demo contract | deployment、metrics、logs、Git、action、recovery 契约 |
+| P0 | 实现 Ops Gateway HTTP client | 正常、超时、无数据、权限错误处理 |
+| P0 | 增加 fast/full 模型适配器 | 确定性替身、真实 tool-calling LLM、统一运行路径 |
+| P0 | 完成发布关联与 Evidence 校验 | baseline/candidate 比较、时间关联、引用验证 |
+| P0 | 增加确定性策略与审批生命周期 | 批准、拒绝、过期、重放测试 |
+| P0 | 实现 recovery investigation | 独立重新取证、恢复成功与失败分类 |
+| P0 | 实现 v0.1 evaluator | 四场景、重复运行、危险动作率 |
+| P0 | 发布联合事故报告 | Evidence、Proposal、Approval、Action、Verification 时间线 |
+| P1 | 增加 Compose 数据源适配 | 真实部署、Prometheus、slow SQL |
+| P2 | 增加 logs/traces 与场景实验室 | 多源 RCA、5–10 场景、评测看板 |
+| P3 | 增加 Kubernetes/Argo 适配 | canary、GitOps、平台状态关联 |
 
 每个 issue 写清楚 owner、依赖、API 输入、验收标准和 demo 方法。
 
@@ -604,28 +606,29 @@ V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 - [ ] 有幂等和重试边界。
 - [ ] 有结构化日志、trace/correlation ID 和耗时指标。
 - [ ] 更新 OpenAPI、示例和 README。
-- [ ] 在至少一个真实场景中通过端到端验证。
+- [ ] 在至少一个当前版本声明的场景中通过端到端验证；v0.1 必须跨真实 HTTP 进程边界。
 - [ ] 失败路径也被记录并能在 eval 报告中看到。
 
 ## 18. 演示时你要展示什么
 
 建议把你的演示控制在 6–8 分钟：
 
-1. 展示 v1 与 v2 canary 的指标差异。
+1. 展示 Gateway 返回的 v1/v2 部署与指标差异，并明确当前数据来自 fixture 还是真实平台。
 2. 启动调查，展示状态机而不是只展示聊天窗口。
-3. 展示 Agent 找到的 metric、log、trace 和 commit 证据。
+3. 展示 Agent 找到的 metric、log 和 commit 证据；trace 在 v0.3 接入后再展示。
 4. 展示主要根因、替代假设、置信度和建议动作。
 5. 展示 MEDIUM 风险动作被阻塞并等待批准。
 6. 批准 rollback 后展示 action ID 和审计记录。
-7. 展示重新验证后的健康、SLO 和 rollout 状态。
-8. 最后展示该场景进入 eval dashboard 后的得分。
+7. 展示重新取证后的 recovery evidence；v0.2 起再展示真实健康、SLO 和 rollout 状态。
+8. 最后展示该场景的 eval report；v0.3 接入 Dashboard 后再展示历史对比。
 
 面试时重点讲工程判断：为什么不用完全自治、为什么证据结构化、如何避免 prompt injection、如何处理遥测缺失、为什么 Gateway 必须幂等，以及一次成功的 API boundary 协作记录。
 
 ## 19. 明确不做的事
 
-- V1 不做通用聊天界面和复杂前端。
-- V1 不做自由形式的自治 shell Agent。
+- 项目主线不做通用聊天界面和复杂前端。
+- 项目主线不做自由形式的自治 shell Agent。
+- 不增加通用 MCP、Skills、长期对话记忆或多智能体编排来复制 mikucli。
 - 不把“模型自称 94% confidence”当成真实性保证。
 - 不用 RAG 或 memory 掩盖基础工具链和数据质量问题。
 - 不追求几十种工具；先保证 5–8 个工具可靠、可测、可审计。
@@ -635,13 +638,13 @@ V1 不需要复杂的多 Agent 框架。先把确定性流程做扎实：
 
 ## 20. 你现在可以立即开始的顺序
 
-1. 与朋友用一页 OpenAPI 冻结部署、指标、日志、动作和状态接口。
-2. 建立 Investigation、Evidence、Finding、Proposal 五个核心 schema。
-3. 用静态测试夹具跑通状态机和 Markdown 事故报告。
-4. 接入朋友提供的 Compose 环境和指标/日志 API。
-5. 先完成 slow SQL 单一场景的端到端闭环。
-6. 加入 risk policy 和审批，不等到最后补安全。
-7. 把同一场景重复运行 3 次并记录方差。
-8. 再扩展 memory leak、bad config 和 Kubernetes canary。
+1. 将现有 fixture 调查通过平台负责人 review 后合并为 Developer Preview。
+2. 与朋友冻结 v0.1 的部署、指标、日志、Git、动作、状态和恢复接口。
+3. 实现 HTTP Gateway client，使 Agent 运行时不再直接读取平台 fixture。
+4. 增加 fast/full 模型适配器，并保留统一的 Evidence 校验与确定性裁决。
+5. 接入平台侧 Mock Gateway，完成 slow SQL 的 RCA、审批、幂等动作和恢复验证。
+6. 加入 `HOLD`、`INCONCLUSIVE` 和恶意日志场景，交给外部 evaluator 评分。
+7. 每个场景重复运行 3 次，完成联合 E2E、README、报告和录屏。
+8. 发布 `portfolio-v0.1.0` 后，再接入 Compose、Prometheus 和真实服务。
 
 如果时间紧，优先保证“发布关联 + 结构化证据 + 策略审批 + 恢复验证 + 可重复评测”这五件事。它们才是 ReleaseGuard 与普通 AIOps demo 的真正区别。

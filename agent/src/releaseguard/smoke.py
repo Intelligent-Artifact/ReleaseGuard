@@ -1,6 +1,6 @@
-"""CP0 契约冒烟测试：确定性 mock 调查 + 可复现输出（CLI / 库函数）。
+"""Developer Preview 契约冒烟测试：确定性 mock 调查 + 可复现输出（CLI / 库函数）。
 
-演示的正是 CP0 与执行手册“阶段 0”的完成标准：
+演示的是 Developer Preview 的完成标准：
 
     Agent 在没有真实基础设施时，也能读取共享契约 fixture，
     完成一次模拟调查（fixture → evidence → finding → 报告），
@@ -9,7 +9,7 @@
 关键取舍：
 
 - 完全确定性：不调用 LLM，不引入随机性。结论由 fixture 数据与固定规则推出，
-  因此任意干净环境重复运行都应得到一致结果（CP0 可复现性门禁）。
+  因此任意干净环境重复运行都应得到一致结果（Developer Preview 可复现性门禁）。
 - 证据 grounded：只引用来自 fixture 的 evidence ID；缺失的日志/trace/git 证据
   会被显式记录在 finding.missing_evidence，绝不编造“已定位到具体 SQL”。
 - 保守处置：变更证据（git）缺失时输出 HOLD/INCONCLUSIVE，不直接建议回滚；
@@ -491,10 +491,10 @@ def default_output_dir() -> Path:
 def main(argv: list[str] | None = None) -> int:
     """CLI 入口：加载共享 fixture → mock 调查 → 打印并保存报告。
 
-    stdout 即为可复现的“Agent 契约冒烟测试输出”，可作为 CP0 验收证据留档：
+    stdout 即为可复现的“Agent 契约冒烟测试输出”，可作为 Developer Preview 验收证据留档：
         在命令后追加 `> agent-smoke-output.txt` 即可保存。
     """
-    parser = argparse.ArgumentParser(description="ReleaseGuard Agent CP0 契约冒烟测试")
+    parser = argparse.ArgumentParser(description="ReleaseGuard Agent Developer Preview 契约冒烟测试")
     parser.add_argument("--fixtures-dir", default=None, help="共享契约 fixture 目录")
     parser.add_argument(
         "--output-dir",

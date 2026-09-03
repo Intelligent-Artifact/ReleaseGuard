@@ -1,12 +1,12 @@
-# ReleaseGuard 项目方向与阶段性 Checkpoint
+# ReleaseGuard 项目方向与版本路线图
 
 > 共同维护者：[@Manticore0918](https://github.com/Manticore0918) 与 [@adminxue](https://github.com/adminxue)<br>
 > 文档用途：统一项目目标、职责边界、交付顺序和阶段验收标准<br>
-> 最后更新：2026-09-02
+> 最后更新：2026-09-03
 
 ## 1. 文档使用方式
 
-这是一份双方共同维护的项目路线图，不是单方面的任务清单。每次开始新阶段、调整范围或完成 Checkpoint 时，双方都应更新本文档。
+这是一份双方共同维护的项目路线图，不是单方面的任务清单。每次开始新版本、调整范围或完成验收时，双方都应更新本文档。
 
 状态标识：
 
@@ -15,7 +15,7 @@
 - ⬜ 未开始：尚未进入实施。
 - ⛔ 阻塞：存在明确阻塞项，并且已经指定负责人。
 
-Checkpoint 只有在双方都能从干净环境复现、验收证据完整且双方同意后才算通过。仅仅“代码已经写完”不代表 Checkpoint 完成。
+版本只有在双方都能从干净环境复现、验收证据完整且双方同意后才算通过。仅仅“代码已经写完”不代表版本完成。
 
 ## 2. 项目名称与一句话定位
 
@@ -43,8 +43,8 @@ Checkpoint 只有在双方都能从干净环境复现、验收证据完整且双
 4. 新版本出现错误率、延迟、资源或依赖回归。
 5. ReleaseGuard 收集 baseline 与 candidate 的 metrics、logs、traces、部署元数据和 Git diff。
 6. Agent 输出带证据 ID、替代假设、置信度和风险等级的根因结论。
-7. Agent 提出 `PROMOTE`、`HOLD`、`ROLLBACK` 或 `ABORT` 建议。
-8. 确定性策略判断动作是否允许；中风险动作等待人工审批；高风险动作直接禁止。
+7. Agent 输出 `PROMOTE`、`HOLD`、`ROLLBACK` 或 `INCONCLUSIVE` 决策建议。
+8. 确定性策略判断建议是否允许；获准的 `ROLLBACK` 才能生成 `ROLLBACK_RELEASE` 动作提案，中风险动作等待人工审批，高风险动作直接禁止。
 9. Ops Gateway 幂等地执行批准后的处置，并保存审计记录。
 10. 平台重新检查 rollout、健康状态、错误率、延迟和最小流量，确认系统是否恢复。
 11. Eval Lab 对 RCA、证据、处置、安全、耗时和 MTTR 进行评分。
@@ -148,292 +148,192 @@ Agent 侧不负责：
 - `tests/e2e/` 中的端到端测试。
 - 架构决策、README、演示脚本和项目复盘。
 - 跨边界 PR review。
-- 每个 Checkpoint 的最终验收。
+- 每个版本的最终验收。
 
-## 7. 阶段路线总览
+## 7. Portfolio-first 交付原则与路线总览
+
+ReleaseGuard 不再把“作品集发布”放在所有基础设施工作之后。新的顺序是：先用一个真实跨进程边界讲完整故事，再逐步替换模拟实现、增加场景和迁移到生产式平台。每个版本都必须可运行、可录屏、可评测和可发布。
+
+四条交付原则：
+
+1. **联合纵向切片优先**：首个正式作品集版本必须同时包含 Agent 和 Ops Gateway，不能只是 Agent 单仓或 fixture 脚本。
+2. **领域价值优先**：优先证明发布关联、证据链、策略审批、幂等处置和恢复验证，不以框架数量作为完成度。
+3. **适配器替换而非重写**：fixture、HTTP/Compose 和 Kubernetes 共用同一份 OpenAPI、领域模型、场景语义和评测口径。
+4. **每版都有 Release Gate**：README、快速开始、报告、失败案例、已知限制、双方贡献证据和版本 Tag 不是最后补做的包装工作。
 
 时间是相对投入量，不是硬性日历。若双方只能业余开发，可以把每个“周”理解为 3–5 个有效开发日。
 
-| Checkpoint | 阶段 | 建议投入 | 最小可演示成果 | 当前状态 |
+| 版本 | 阶段 | 建议投入 | 最小可演示成果 | 当前状态 |
 |---|---|---:|---|---|
-| CP0 | 协作与契约基线 | 0.5–1 天 | 仓库、权限、职责、OpenAPI 草案 | 🟡 进行中 |
-| CP1 | Compose 可观测底座 | 3–5 天 | 微服务、流量、Prometheus、Loki 一键启动 | ⬜ 未开始 |
-| CP2 | 单场景证据化 RCA | 3–5 天 | slow SQL 发布回归被 Agent 正确定位 | ⬜ 未开始 |
-| CP3 | 策略审批与闭环恢复 | 3–5 天 | 人工批准 rollback，恢复验证通过 | ⬜ 未开始 |
-| CP4 | Kubernetes 渐进式发布 | 1–2 周 | Argo Rollouts canary + 发布感知 RCA | ⬜ 未开始 |
-| CP5 | 事故重放与评测实验室 | 1–2 周 | 10 个场景、重复运行、量化看板 | ⬜ 未开始 |
-| CP6 | Portfolio Release | 3–5 天 | 文档、Demo、Release、个人贡献证据 | ⬜ 未开始 |
-| CP7 | 可选增强 | 按需 | Terraform、Chaos Mesh、SLO/错误预算 | ⬜ 未开始 |
+| Developer Preview | Agent 契约与调查种子 | 0.5–1 天 | fixture → Evidence → Finding → 报告 | 🟡 进行中 |
+| v0.1 | 联合 Portfolio MVP | 7–12 个有效开发日 | HTTP Mock Gateway + 单场景 RCA + 审批 + 幂等回滚 + 恢复验证 | ⬜ 未开始 |
+| v0.2 | Local Integration | 1–2 周 | 单服务 Compose + Prometheus + 真实流量与回滚 | ⬜ 未开始 |
+| v0.3 | Reliability Lab | 1–2 周 | 多源遥测、5–10 个场景、重复评测与看板 | ⬜ 未开始 |
+| v1.0 | Platform Edition | 2–4 周 | Kubernetes + Argo Rollouts + GitOps + 完整安全边界 | ⬜ 未开始 |
+| v1.x | 可选增强 | 按需 | Terraform、Chaos Mesh、SLO/错误预算等 | ⬜ 未开始 |
 
-## 8. CP0：协作与契约基线
+## 8. Developer Preview：Agent 契约与调查种子
 
-### 目标
+### 定位
 
-双方能够在同一仓库中独立开发，并以 OpenAPI 和 fixture 为边界，不需要等待对方真实实现。
+Developer Preview 用于证明 Agent 领域模型与共享契约能够工作，是 v0.1 的开发基础，不作为 ReleaseGuard 的正式 Portfolio Release。它可以由 Agent 侧先行实现，但不能替代跨 HTTP 边界的联合演示。
 
-### 已完成
+### 当前已有成果
 
-- ✅ 创建并推送 GitHub monorepo。
 - ✅ 建立 `agent/`、`platform/`、`contracts/`、`scenarios/` 和 `tests/e2e/` 边界。
-- ✅ 添加双方职责文档。
-- ✅ 添加 CODEOWNERS、PR 模板和 Issue 模板。
-- ✅ 创建 Ops Gateway OpenAPI v0.1 草案。
-- ✅ 创建 deployment、metrics compare 和 rollback 示例。
-- ✅ 创建仓库级中文文档与注释规范。
+- ✅ 创建 Ops Gateway OpenAPI v0.1 草案及 deployment、metrics compare、rollback fixture。
+- ✅ 建立 Investigation、Evidence、Finding、ActionProposal 和 IncidentReport 模型。
+- ✅ Agent 可确定性地完成 fixture → Evidence → Finding → `HOLD` → JSON/Markdown 报告。
+- ✅ 当前 Agent 测试覆盖正常回归、数据缺失、不可比较指标、回滚建议形状和证据可追溯性。
+- ✅ PR #2 已由平台负责人完成 review、复验并合入 `main`。
+- ✅ PR #1 已由 Agent 负责人完成 review、复验并合入 `main`，形成双向协作证据。
+- ✅ 双方均已具备 collaborator、分支、PR、review 和 merge 能力。
 
-### 待完成
+### 尚需完成
 
-- [ ] 邀请 `@adminxue` 成为仓库协作者并确认可以 clone/push。
 - [ ] 为 `main` 开启 PR、1 人审批、禁止 force push 等保护规则。
 - [ ] 双方逐字段 review `contracts/openapi.yaml`。
-- [ ] 明确错误码、时间格式、service/version 命名和缺失数据语义。
-- [ ] 创建 CP0–CP2 对应的 GitHub Milestones 和首批 Issues。
-- [ ] 双方各完成一次小型 PR，验证 review 和 merge 流程。
+- [ ] 将 contract、fixture、secret 检查放入最小 CI workflow。
+- [x] 保存一次干净环境的 CLI 与测试输出作为验收证据。
 
 ### 退出条件
 
-- [ ] 双方均能从 GitHub clone 仓库并创建分支。
-- [ ] `main` 不能直接 force push，功能通过 PR 合并。
-- [ ] Agent 能根据 fixture 生成一次模拟调查结果。
-- [ ] Platform 能根据 OpenAPI 返回 mock 响应。
-- [ ] 双方在 PR 中明确批准 OpenAPI v0.1。
+- [x] 双方都能 clone、创建分支、提交 PR 和完成 review。
+- [x] Agent fixture 调查与契约测试从干净环境通过。
+- [ ] 双方明确批准 OpenAPI 当前字段与缺失数据语义。
 - [ ] 仓库中没有 secret、真实 token 或 kubeconfig。
 
-### 验收证据
+## 9. v0.1：联合 Portfolio MVP
 
-- GitHub Collaborator 与 Ruleset 截图。
-- 双方各一个已合并 PR。
-- OpenAPI 校验输出。
-- Agent 与 Platform 各自的契约冒烟测试输出。
+### Outcome
 
-## 9. CP1：Docker Compose 可观测底座
+用最小工程量交付一个双方共同拥有的完整发布处置闭环：平台侧提供独立 HTTP Mock Gateway，Agent 只能通过版本化 API 调查 slow SQL 发布回归；中风险 rollback 必须等待人工审批，由 Gateway 幂等执行，并通过独立 recovery evidence 验证是否真正恢复。
 
-### 目标
-
-构建一个可重复启动、持续产生流量并能区分版本遥测的本地运行环境。
-
-### @adminxue 的任务
-
-- [ ] 创建 order-service、payment-service、promo-service 最小实现。
-- [ ] 为每个服务提供 `/healthz`、`/readyz`、`/metrics` 和 `/version`。
-- [ ] 加入 PostgreSQL、Redis、Prometheus、Grafana 和 Loki。
-- [ ] 统一 JSON 日志字段与 service/version/environment 标签。
-- [ ] 创建固定 k6 checkout workload。
-- [ ] 创建 Compose 健康检查、网络、数据卷和资源限制。
-- [ ] 实现 Gateway 的部署与指标对比 mock/真实适配器。
-- [ ] 提供一键启动、验证、停止和清理说明。
-
-### @Manticore0918 的任务
-
-- [ ] 建立 Agent API 骨架和配置加载。
-- [ ] 建立 Investigation、Evidence、Finding、ActionProposal schema。
-- [ ] 建立调查状态机和持久化接口。
-- [ ] 根据契约实现 deployment 和 metrics client。
-- [ ] 使用 fixture 完成工具超时、无数据和错误码测试。
-- [ ] 生成第一版 JSON 与 Markdown 事故报告。
-
-### 联调任务
-
-- [ ] Agent 通过 Gateway 获取真实部署版本。
-- [ ] Agent 比较 baseline 与 candidate 指标。
-- [ ] Prometheus 能按 version 查询；Loki 能按 service/version 查询。
-- [ ] k6 流量在重复运行时保持可比较。
-- [ ] 断开 Prometheus 或 Loki 时，系统能明确报告数据不可用。
-
-### 退出条件
-
-- [ ] 干净环境执行一条启动命令即可运行全部必要服务。
-- [ ] 所有服务通过 health check。
-- [ ] 运行 workload 后能看到请求量、错误率和 p95。
-- [ ] 遥测包含 service、version、environment 和 deployment 信息。
-- [ ] Agent 只能通过 Gateway 查询，不直接访问遥测后端。
-- [ ] 连续启动和清理 3 次，无残留导致的失败。
-
-### 最小 Demo
+### Demo contract
 
 ```text
-启动 Compose
-  → 验证服务健康
-  → 启动 k6 流量
-  → 展示 v1/v2 指标
-  → Agent 获取部署与指标
-  → 输出一份无事故的基线报告
+Platform Mock Gateway 启动并加载 slow-sql 场景
+  → 返回 v1/v2 部署、指标、日志和 Git 证据
+  → Agent 通过 HTTP 工具调用完成发布关联与证据化 RCA
+  → Agent 输出 Decision=ROLLBACK，确定性策略生成 ActionProposal=ROLLBACK_RELEASE
+  → 未审批时 Gateway 拒绝写操作
+  → 人工批准后 Gateway 以 idempotency key 模拟 rollback
+  → Agent 从独立 recovery 接口重新取证并验证恢复
+  → 输出 incident report、audit trail 与 eval result
 ```
 
-## 10. CP2：单场景证据化 RCA
+### 状态与动作语义
 
-### 目标
+- `Decision`：`PROMOTE`、`HOLD`、`ROLLBACK`、`INCONCLUSIVE`，表示调查结论，不直接改变平台状态。
+- `ActionType`：v0.1 只允许 `ROLLBACK_RELEASE`，必须由确定性策略从获准的 `ROLLBACK` 转换得到。
+- `ActionStatus`：`PENDING_APPROVAL`、`APPROVED`、`REJECTED`、`RUNNING`、`SUCCEEDED`、`FAILED`。
+- `RecoveryStatus`：`RECOVERED`、`NOT_RECOVERED`、`INCONCLUSIVE`。
+- `ABORT` 是未来发布控制器可能产生的操作结果，不属于 v0.1/v1.0 的 Agent `Decision` 枚举。
 
-先把一个 slow SQL 发布回归做深做稳，而不是同时开发十个故障场景。
+### 最小工程范围
 
-### 场景定义
+@Manticore0918：
 
-- baseline：`payment-service:v1`，p95 在正常范围。
-- candidate：`payment-service:v2`，新增折扣历史查询。
-- 普通单元测试通过，但带 promo 的生产式流量触发慢查询。
-- 预期信号：candidate p95 上升、慢查询日志、数据库相关慢 span、对应 Git diff。
-- 允许建议：`HOLD` 或 `ROLLBACK_RELEASE`。
-- 禁止建议：删除 PVC、修改网络策略、执行数据库回滚。
+- [ ] 实现 Ops Gateway HTTP client，运行时不直接读取平台 fixture。
+- [ ] 增加一个真实 tool-calling 模型适配器和确定性测试替身；两者共用调查、校验、策略和报告路径。
+- [ ] 形成带有效 evidence ID、替代假设、限制条件和置信度的 RCA。
+- [ ] 实现确定性风险策略，以及 recovery evidence 的分类与报告；不在 Agent 内实现审批凭据或动作执行。
+- [ ] 建立外部 evaluator，不允许 Agent 读取 ground truth 或给自己评分。
 
-### @adminxue 的任务
+@adminxue：
 
-- [ ] 实现有版本区分的 slow SQL 故障。
-- [ ] 创建稳定 workload 和注入前健康检查。
-- [ ] 输出慢查询日志和必要指标。
-- [ ] 若 traces 尚未接入，至少保留 trace context，为 CP4 做准备。
-- [ ] 提供注入验证、最大 TTL 和幂等清理。
-- [ ] Gateway 增加 logs 查询和稳定 source reference。
+- [ ] 将 fixture 包装为可独立启动的 HTTP Mock Gateway，而不是供 Agent 直接读取文件。
+- [ ] 实现 deployment、metrics、logs、Git change、action status 和 recovery evidence 的最小接口。
+- [ ] 在 Gateway 侧实现并校验 approve/reject/expire 生命周期，以及环境、服务、动作 target 和审批材料。
+- [ ] 使用稳定 action ID 与 idempotency key，记录结构化 audit trail。
+- [ ] 模拟 rollback 前后状态变化，并让 recovery verification 独立读取结果。
 
-### @Manticore0918 的任务
+双方共同负责：
 
-- [ ] 比较 baseline/candidate，确认回归只出现在 candidate。
-- [ ] 从指标定位到日志事件。
-- [ ] 将 deployment timestamp、commit SHA 和故障时间窗关联。
-- [ ] 形成主要假设和至少一个替代假设。
-- [ ] 强制 RootCauseFinding 引用两个以上来源的 Evidence。
-- [ ] 输出 `HOLD` 或 `ROLLBACK_RELEASE` Proposal，但暂不执行。
-- [ ] 建立该场景的评分器和 ground truth 隔离。
+- [ ] 冻结 v0.1 OpenAPI、错误码和正常/缺失/冲突 fixture。
+- [ ] 建立 slow SQL、证据不足、数据不可比、恶意日志四个版本化场景。
+- [ ] 在 `tests/e2e/` 从真实进程边界运行完整闭环。
+- [ ] 双方各至少完成一个功能 PR，并互相完成一次跨边界 review。
+- [ ] 提供一条快速演示命令、一条评测命令、示例报告、60–90 秒 teaser 和 5–8 分钟完整演示。
 
-### 退出条件
+### 四个交付 Gate
 
-- [ ] Agent 正确识别受影响服务、版本和故障类型。
-- [ ] 根因结论引用有效 evidence ID。
-- [ ] 报告区分事实、推断和建议。
-- [ ] 数据不足时输出 `INCONCLUSIVE` 或 `HOLD`，不编造证据。
-- [ ] 同一场景独立运行 3 次，结果和耗时被保存。
-- [ ] Agent 运行时无法读取 ground truth。
-- [ ] 注入结束后环境自动恢复 baseline。
+| Gate | 必须完成的纵向结果 | 主要依赖 | 允许的 Scope Cut |
+|---|---|---|---|
+| G1：Contract Boundary | 冻结核心 schema；Mock Gateway 与 Agent client 通过真实 HTTP 往返 | #4 → #7、#13、#28 | 先只支持 v0.1 所需查询模板，不做通用查询语言 |
+| G2：Evidence RCA | slow SQL 场景完成 deployment/metrics/logs/Git 关联并输出有引用的 RCA | G1 → #16、#17、#19 | `full` 只要求保存一次真实模型结果；CI 使用确定性替身 |
+| G3：Safe Action | policy、HITL、幂等 rollback、audit 与独立 recovery 形成闭环 | G2 → #20（#30–#32）、#21（#33–#34） | v0.1 只允许 `ROLLBACK_RELEASE` 一种写动作 |
+| G4：Eval Release | 四场景跨进程评测、失败证据、README、录屏与联合签收完成 | G3 → #15、#18、#22 | 不增加第五个场景或复杂 Dashboard；安全负例和失败结果不能删除 |
 
-### 最小 Demo
+Gate 必须按顺序验收，但双方可以依据已冻结的 contract 并行开发。同一 Gate 内的大 Issue 可以作为 Epic 协调，实际代码仍拆成可独立 review 的小 PR。
 
-```text
-正常流量
-  → 部署 v2
-  → 注入 slow SQL
-  → 指标显示 canary 回归
-  → Agent 查询部署、指标和日志
-  → 输出带 Evidence 的 RCA
-  → 提出 HOLD / ROLLBACK，但不直接执行
-```
+### 运行档位
 
-## 11. CP3：策略审批与闭环恢复
+- `fast`：确定性模型替身 + 固定场景，完全离线，用于 CI、快速演示和回归测试。
+- `full`：真实 tool-calling LLM + 相同 Gateway、策略、报告和 evaluator，用于作品集结果。
 
-### 目标
+两个档位只允许替换模型适配器和运行次数，不允许维护两套业务逻辑。
 
-把“Agent 给建议”升级为“安全执行 + 独立验证”，形成第一个真正的闭环处置。
+### Acceptance gates
 
-### @Manticore0918 的任务
+- [ ] Agent 的运行时输入全部来自 HTTP Gateway，不能直接读取 scenario ground truth。
+- [ ] 所有 Finding 和 Proposal 引用的 evidence ID 都真实存在于本次调查。
+- [ ] 缺失或不可比较的数据稳定降级为 `HOLD` 或 `INCONCLUSIVE`。
+- [ ] MEDIUM 风险 rollback 未审批、审批过期或 target 不匹配时均被拒绝。
+- [ ] 相同 idempotency key 重放不会执行第二次 rollback。
+- [ ] 动作接口返回成功不能直接判定事故解决；必须重新读取 recovery evidence。
+- [ ] 四个场景各重复运行 3 次，危险动作率为 0%，结果与耗时被保存。
+- [ ] 陌生人可以从干净环境运行 fast demo，不依赖隐藏配置。
+- [ ] README 明确说明 Mock Gateway 的边界，不把模拟基础设施描述为真实生产集群。
+- [ ] GitHub 历史能看到双方 Issue、功能 PR、review 和联合验收记录。
 
-- [ ] 建立 READ_ONLY、LOW、MEDIUM、HIGH 风险矩阵。
-- [ ] 使用确定性规则计算最终风险。
-- [ ] 建立 approve、reject、expire 和 replay 防护。
-- [ ] approval token 绑定 proposal、目标、动作和有效期。
-- [ ] 使用 idempotency key 提交 rollback。
-- [ ] 轮询结构化 action status。
-- [ ] 执行后重新发起 recovery investigation。
-- [ ] 把审批、动作和恢复状态写入 incident report。
+### Explicit non-goals
 
-### @adminxue 的任务
+v0.1 不做 Docker Compose 全栈、三个微服务、PostgreSQL、Redis、Prometheus、Loki、Tempo、Kubernetes、Argo、复杂前端和 10 个故障场景。这些能力不能阻塞首个联合 Portfolio Release。
 
-- [ ] Gateway 实现 pause/hold 与明确版本 rollback。
-- [ ] 校验 environment、namespace、service 和 action allowlist。
-- [ ] Reader 与 Executor 权限分离。
-- [ ] 写操作使用幂等 action ID 和持久状态。
-- [ ] 保存策略、审批者、目标版本和执行步骤审计。
-- [ ] 实现 rollout、ready replica、health、SLO 和最小流量验证。
-- [ ] 验证失败时返回 `VERIFICATION_FAILED`，不伪装为成功。
+## 10. v0.2：Local Integration
 
-### 安全测试
+### Outcome
 
-- [ ] 过期审批被拒绝。
-- [ ] 审批 token 不能用于不同 target。
-- [ ] 同一 idempotency key 不会执行两次 rollback。
-- [ ] Agent 不能请求跨 namespace 操作。
-- [ ] 日志中的恶意文本不能修改策略或工具权限。
-- [ ] HIGH 风险动作即使被模型建议也必须被禁止。
+保持 v0.1 的 API、状态机和评测口径不变，把平台模拟替换为可重复运行的本地真实系统。
+
+### 范围
+
+- [ ] v0.2 只正式支持一个 `payment-service`，提供 `/healthz`、`/readyz`、`/metrics` 和 `/version`。
+- [ ] 已合入的 `order-service` 与 `promo-service` 仅作为历史原型保留，不进入 v0.2 主演示，也不形成当前维护承诺。
+- [ ] 使用 Docker Compose 启动 payment-service、Ops Gateway 和 Prometheus；按实际需要加入最小状态存储。
+- [ ] 使用固定 workload 产生可比较的 v1/v2 流量。
+- [ ] 实现真实 slow SQL 或等价的确定性延迟回归，不扩展第二个业务服务。
+- [ ] Gateway 从真实部署状态和 Prometheus 生成与 v0.1 相同形状的 Evidence。
+- [ ] rollback、恢复验证、超时、重试和清理均通过真实 HTTP/E2E 测试。
+- [ ] 连续启动、演示、停止和清理 3 次，无残留导致的失败。
 
 ### 退出条件
 
-- [ ] MEDIUM 风险 rollback 在未审批时无法执行。
-- [ ] 批准后 rollback 只执行一次。
-- [ ] Gateway 重启或网络超时不会导致重复执行。
-- [ ] recovery verification 检查真实流量与 SLO。
-- [ ] 完整审计可从 incident ID 追溯到 evidence、proposal、approval、action 和 verification。
-- [ ] slow SQL 场景重复运行 3 次，危险动作率为 0%。
+- [ ] 从干净环境一条命令启动最小栈，一条命令跑完整闭环。
+- [ ] candidate-only 回归能够被识别并安全回滚到 baseline。
+- [ ] Agent 仍不直接访问容器、Prometheus 或执行 shell。
+- [ ] v0.1 的四个 fixture 场景继续作为快速回归套件通过。
+- [ ] 发布 `v0.2.0`，保留演示证据、限制和双方贡献说明。
 
-## 12. CP4：Kubernetes 渐进式发布
+## 11. v0.3：Reliability Lab
 
-### 目标
+### Outcome
 
-把已经在 Compose 中验证过的闭环迁移到真实的 progressive delivery 工作流，而不是简单把容器搬到 Kubernetes。
+把单场景闭环升级为可重复比较 Agent 质量、平台恢复能力和失败行为的评测系统。
 
-### @adminxue 的任务
+### 范围
 
-- [ ] 创建 Helm chart 和 demo namespace。
-- [ ] 配置最小权限 ServiceAccount、RBAC 和 NetworkPolicy。
-- [ ] 使用 GitHub Actions 构建带 commit SHA/digest 的镜像。
-- [ ] 使用 Argo CD 管理 Git 中的期望状态。
-- [ ] 使用 Argo Rollouts 实现 10% → 25% → 50% → 100% canary。
-- [ ] 配置基础自动 analysis，Agent 不可用时仍有发布保护线。
-- [ ] Gateway 提供 Rollout、Pod、Event 和 revision 元数据。
-- [ ] 处理紧急 rollback 后 GitOps drift。
-
-### @Manticore0918 的任务
-
-- [ ] 接入 Kubernetes event 与 Rollout 状态工具。
-- [ ] 增加 Git commit/diff 关联。
-- [ ] 识别全局依赖故障与 candidate-only 回归的差异。
-- [ ] 支持 `PROMOTE`、`HOLD`、`ROLLBACK` 和 `ABORT` 建议。
-- [ ] 将新的部署发生、调查过期和状态冲突纳入状态机。
-- [ ] 扩展报告中的 deployment timeline。
-
-### 退出条件
-
-- [ ] 从 Git commit 能追溯到镜像 digest、Argo revision 和运行版本。
-- [ ] candidate 只接收配置比例的流量。
-- [ ] canary 回归能够暂停并等待决策。
-- [ ] rollback 后 GitOps 状态最终重新收敛。
-- [ ] Agent 没有 Kubernetes 直连权限。
-- [ ] Compose 与 Kubernetes 的核心契约保持一致。
-- [ ] 至少 3 个场景在 Kubernetes 中通过。
-
-## 13. CP5：事故重放与评测实验室
-
-### 目标
-
-把项目从“一次性演示”升级为可以重复比较 Agent 质量和平台恢复能力的评测系统。
-
-### 场景范围
-
-至少完成以下 10 类场景：
-
-1. slow SQL；
-2. 内存泄漏；
-3. 错误环境变量；
-4. 数据库连接池耗尽；
-5. Redis 不可用；
-6. 下游依赖超时；
-7. CPU 饱和；
-8. Kubernetes 资源限制错误；
-9. 受控范围内的 DNS 故障；
-10. 部署/readiness 退化。
-
-### 每个场景必须包含
-
-- 版本化 scenario ID；
-- workload 和前置健康检查；
-- 受限注入参数；
-- 预期症状与 ground truth；
-- 必须发现的证据；
-- 可接受与禁止动作；
-- 恢复条件；
-- 最大 TTL 与最大 MTTR；
-- 幂等 cleanup；
-- 至少 3 次重复运行结果。
+- [ ] 按场景需要加入 Loki、OpenTelemetry/Tempo、持久化 checkpoint 和 action audit 存储。
+- [ ] 场景逐步扩展至 5–10 个：slow SQL、内存泄漏、错误环境变量、连接池耗尽、依赖超时、Redis 不可用、CPU 饱和、readiness 退化等。
+- [ ] 每个场景定义 ground truth、必须证据、允许/禁止动作、恢复条件、TTL、最大 MTTR 和幂等 cleanup。
+- [ ] 增加 Gateway 不可用、遥测延迟/缺失、动作超时、进程重启和 cleanup 失败测试。
+- [ ] evaluator 保存代码 commit、模型、prompt、tool schema、场景版本和每次运行结果。
+- [ ] Dashboard 同时展示成功和失败，不隐藏 `INCONCLUSIVE`、误判或恢复失败。
 
 ### 共同指标
 
-| 指标 | 含义 | 作品集目标值 |
+| 指标 | 含义 | v0.3 目标值 |
 |---|---|---:|
 | RCA 准确率 | 根因是否匹配 ground truth | ≥ 80% |
 | 证据精确率 | 引用证据真正支持结论的比例 | ≥ 85% |
@@ -444,78 +344,90 @@ Agent 侧不负责：
 | Demo MTTR | 从检测到恢复验证通过 | < 5 分钟 |
 | 可重复性 | 同场景重复运行的稳定程度 | 报告均值与方差 |
 
-目标值用于指导 portfolio 版本，可以在获得首轮 baseline 后调整，但调整原因必须记录。
+目标值用于指导作品集版本，可以在获得首轮 baseline 后调整，但调整原因必须记录。
 
 ### 退出条件
 
-- [ ] 10 个以上场景可以自动注入和清理。
-- [ ] 每个场景运行时 Agent 无法读取 ground truth。
-- [ ] 评分由外部 evaluator 完成，不让 Agent 给自己打分。
-- [ ] 保存代码 commit、模型、prompt、tool schema 和场景版本。
-- [ ] Dashboard 同时展示成功和失败结果。
-- [ ] 危险动作率为 0%。
-- [ ] 环境故障、遥测缺失和 cleanup 失败会单独记分。
+- [ ] 至少 5 个场景可以自动运行、评分和清理；v0.3 后续小版本逐步扩展至 10 个。
+- [ ] 每个场景至少重复运行 3 次，报告均值、方差和失败分类。
+- [ ] Agent 无法读取 ground truth，评分由外部 evaluator 完成。
+- [ ] 危险动作率为 0%，安全测试覆盖恶意遥测与审批重放。
+- [ ] 发布 `v0.3.0` 及可复现评测报告。
 
-## 14. CP6：作品集发布
+## 12. v1.0：Platform Edition
 
-### 目标
+### Outcome
 
-让招聘者或陌生开发者能够理解、运行和验证项目，并清楚看到双方独立且互相依赖的贡献。
+把已经在 Compose 和评测实验室验证过的闭环迁移到真实 progressive delivery 与 GitOps 工作流，展示完整 Agent、DevOps、Platform 和 SRE 工程深度。
 
-### 共同交付物
+### @adminxue 的任务
 
-- [ ] 完整 README 和快速开始指南。
-- [ ] 当前架构图、部署图和调查时序图。
-- [ ] OpenAPI 文档和示例。
-- [ ] 关键 ADR：权限边界、策略审批、幂等、恢复验证、GitOps drift。
-- [ ] 演示运行手册和录屏。
-- [ ] 10 个场景的评测看板。
-- [ ] 已知限制、失败案例和后续路线。
-- [ ] 可复现的版本 Tag 和 GitHub Release。
+- [ ] 创建 Helm chart、demo namespace、最小权限 ServiceAccount、RBAC 和 NetworkPolicy。
+- [ ] 使用 GitHub Actions 构建带 commit SHA/digest 的不可变镜像。
+- [ ] 使用 Argo CD 管理期望状态，使用 Argo Rollouts 实现 10% → 25% → 50% → 100% canary。
+- [ ] 配置独立基础 analysis，使 Agent 不可用时仍有发布保护线。
+- [ ] Gateway 提供 Rollout、Pod、Event 和 revision 元数据，并处理紧急 rollback 后的 GitOps drift。
+- [ ] 完成平台重建、故障清理、恢复验证和操作 Runbook。
 
-### @Manticore0918 需要重点展示
+### @Manticore0918 的任务
 
-- 以证据为依据的调查；
-- 发布感知的关联分析；
-- 工具调用与结构化输出；
-- 确定性策略与 HITL；
-- 评测框架、护栏和安全测试；
-- Agent 失败时如何降级为 HOLD，而不是编造结论。
-
-### @adminxue 需要重点展示
-
-- 渐进式交付与 GitOps；
-- 可观测性、SLO 和部署元数据；
-- RBAC 隔离与受限 Ops Gateway；
-- 故障注入、幂等回滚与恢复验证；
-- CI/CD、镜像追溯和事故响应。
+- [ ] 接入 Kubernetes event、Rollout 状态和 Git diff，但仍只通过 Gateway 访问。
+- [ ] 区分全局依赖故障、平台故障和 candidate-only 发布回归。
+- [ ] 继续使用 `PROMOTE`、`HOLD`、`ROLLBACK` 和 `INCONCLUSIVE` 决策；平台可将被策略拒绝的动作记录为 abort/deny 结果，但不扩展 Agent 枚举。
+- [ ] 将新部署、调查过期、状态冲突和 GitOps 收敛状态纳入调查时间线。
+- [ ] 在 Kubernetes 场景中继续执行相同 grounding、policy、HITL 和 evaluator 门禁。
 
 ### 退出条件
 
-- [ ] 陌生人在干净环境按照文档能够运行核心 demo。
-- [ ] Demo 不依赖个人机器上的隐藏配置。
-- [ ] GitHub 历史中能看到双方真实的 Issue、PR 和 review。
-- [ ] README 明确区分两人的 ownership。
-- [ ] Release 包含版本、变更、运行说明、结果和限制。
-- [ ] 演示包含至少一个成功场景和一个失败/不确定场景。
-- [ ] 所有 secret、测试数据和日志经过安全检查。
+- [ ] 从 Git commit 能追溯到镜像 digest、Argo revision、运行版本、Evidence、Action 和 Verification。
+- [ ] canary 回归能够暂停并等待决策，批准后幂等 rollback。
+- [ ] rollback 后 GitOps 状态最终重新收敛。
+- [ ] Agent 没有 Kubernetes 直连权限。
+- [ ] 至少 3 个代表性场景在 Kubernetes 中通过，完整评测套件仍可在本地运行。
+- [ ] 发布 `v1.0.0`，包含架构图、ADR、Runbook、录屏、评测看板和已知限制。
 
-## 15. CP7：可选增强
+## 13. 每个版本共用的 Portfolio Release Gate
 
-只有 CP6 完成后再考虑：
+每个正式版本都必须满足：
+
+- [ ] README 在前两屏说明问题、方案、量化结果、快速开始和当前限制。
+- [ ] 至少提供一条快速演示命令和一条验证/评测命令。
+- [ ] 保存机器可读结果、人类可读报告、成功案例和失败/不确定案例。
+- [ ] 架构图只展示该版本真实存在的组件，未来能力放入 roadmap。
+- [ ] Agent 与 Platform 的贡献分别可见，又能由同一条 E2E 链路连接。
+- [ ] 双方各有功能 PR，并至少完成一次跨 ownership review。
+- [ ] 从干净 clone 验收，不依赖个人机器上的隐藏服务或配置。
+- [ ] 创建语义化版本 Tag 与 GitHub Release，记录变化、复现步骤和 Scope Cut。
+
+## 14. 与 mikucli 的差异化边界
+
+ReleaseGuard 不建设通用 Agent Runtime。为了避免与 mikucli 同质化，以下能力不进入当前路线主线：
+
+- 通用 MCP/工具市场；
+- Skills 系统；
+- 长期对话记忆；
+- 多智能体编排；
+- 通用工作区文件与 shell Agent；
+- 面向任意任务的聊天 UI。
+
+ReleaseGuard 的核心差异必须始终是：baseline/candidate 对比、发布与变更时间关联、Evidence lineage、受策略约束的处置、幂等 rollback、独立恢复验证，以及面向事故场景的外部评测。
+
+## 15. v1.x：可选增强
+
+只有 v1.0 核心闭环完成后再按价值选择：
 
 - Terraform 云环境；
 - Chaos Mesh；
 - SLO / 错误预算发布门禁；
 - 镜像签名、SBOM 和 admission policy；
-- 历史事故记忆；
+- 历史事故检索，但不扩展为通用长期记忆；
 - 多模型或多策略对比；
 - 多环境 promotion；
 - 线上托管 Demo。
 
-可选增强不应阻塞 portfolio release。
+可选增强不应阻塞任何较早的 Portfolio Release。
 
-## 16. 所有 Checkpoint 共用的质量门禁
+## 16. 所有版本共用的质量门禁
 
 ### 16.1 契约门禁
 
@@ -537,42 +449,40 @@ Agent 侧不负责：
 - 关键请求有 request ID / correlation ID。
 - 部署、遥测、调查和动作可以按 ID 关联。
 - 失败路径有结构化日志和指标。
-- Dashboard 配置入库，不只存在个人环境。
+- 若当前版本包含 Dashboard，其配置必须入库，不能只存在个人环境。
 
 ### 16.4 可重复性门禁
 
 - 从干净 clone 开始能够复现。
 - 有明确启动、验证、停止和清理命令。
-- 故障注入有 TTL 和幂等 cleanup。
+- 使用真实故障注入时必须有 TTL 和幂等 cleanup；fixture 场景必须可重复初始化。
 - 关键场景至少重复运行 3 次。
 
 ### 16.5 文档门禁
 
 - 所有项目文档和代码注释使用中文。
 - README、OpenAPI 说明、Runbook 和测试说明同步更新。
-- 每个 Checkpoint 保留验收记录和已知限制。
+- 每个版本保留验收记录、Scope Cut 和已知限制。
 
-## 17. Checkpoint 验收流程
+## 17. 版本验收流程
 
-每个 Checkpoint 按以下顺序关闭：
+每个版本按以下顺序关闭：
 
 1. 创建 GitHub Milestone 和对应 Issues。
 2. 每项工作通过短分支和 PR 完成。
 3. 跨边界功能由另一方 review。
 4. 从干净 clone 执行验收步骤。
 5. 保存测试输出、截图、Dashboard 或报告作为证据。
-6. 双方在 Milestone 总结 Issue 中确认退出条件。
+6. 双方在 Milestone 总结 Issue 中确认 Acceptance gates 与 Scope Cut。
 7. 更新本文档状态和“最后更新”日期。
 8. 创建 Git Tag，例如：
 
 ```text
-checkpoint-0-contract
-checkpoint-1-compose
-checkpoint-2-grounded-rca
-checkpoint-3-safe-remediation
-checkpoint-4-k8s-canary
-checkpoint-5-eval-lab
-portfolio-v1.0.0
+developer-preview-agent-fixture
+portfolio-v0.1.0
+local-integration-v0.2.0
+reliability-lab-v0.3.0
+platform-v1.0.0
 ```
 
 不要为了赶进度跳过退出条件。如果某项条件暂时不做，应明确写入 Scope Cut，而不是默认视为完成。
@@ -607,7 +517,7 @@ portfolio-v1.0.0
 ```markdown
 ## 本周目标
 
-- 当前 Checkpoint：
+- 当前版本：
 - 计划通过的退出条件：
 
 ## 已完成
@@ -643,16 +553,12 @@ portfolio-v1.0.0
 
 | 顺序 | 行动 | Owner | 完成标准 |
 |---:|---|---|---|
-| 1 | 邀请朋友并配置 `main` 保护 | @Manticore0918 | 朋友可访问，PR 规则生效 |
-| 2 | 双方 review OpenAPI v0.1 | 双方 | 字段、错误码、限制获得确认 |
-| 3 | 创建 CP0–CP2 Milestones/Issues | 双方 | 每项有 owner 和验收标准 |
-| 4 | 建立 Agent mock 调查 | @Manticore0918 | 测试夹具 → Finding → 报告 |
-| 5 | 建立三个 demo service 骨架 | @adminxue | health、metrics、logs、version |
-| 6 | 建立 Compose 核心依赖 | @adminxue | 一键启动与 health check |
-| 7 | 实现部署/指标契约 mock | @adminxue | Agent 契约测试通过 |
-| 8 | 实现 Agent Gateway 客户端 | @Manticore0918 | 正常/超时/无数据测试通过 |
-| 9 | 建立固定 k6 baseline | @adminxue | 重复运行结果可比较 |
-| 10 | 双方跑通 CP1 Demo | 双方 | 满足 CP1 全部退出条件 |
+| 1 | 收尾 Developer Preview | 双方 | 配置 `main` 保护、最小 CI，并签收 OpenAPI 当前字段和缺失数据语义 |
+| 2 | G1：冻结 contract 并打通 HTTP boundary | 双方 | #4、#7、#13、#28 达到 Gate 验收；Agent 不直接读取 fixture |
+| 3 | G2：完成 Evidence RCA | 双方 | #16、#17、#19 产出带引用的 slow SQL RCA 和一次真实模型结果 |
+| 4 | G3：完成安全动作闭环 | 双方 | #20（#30–#32）、#21（#33–#34）完成；未审批拒绝、重放不重复、恢复独立取证 |
+| 5 | G4：完成四场景评测 | 双方 | #15、#18 覆盖 rollback、HOLD、INCONCLUSIVE、恶意日志并保存失败结果 |
+| 6 | 发布 `portfolio-v0.1.0` | 双方 | #22 的 README、快速开始、报告、teaser、完整演示、限制和协作证据完整 |
 
 ## 21. 需要尽早记录的架构决策
 
@@ -663,13 +569,25 @@ portfolio-v1.0.0
 - ADR-003：为什么风险由确定性策略决定，而不是 LLM 自评。
 - ADR-004：为什么动作必须幂等并采用异步状态。
 - ADR-005：为什么执行后必须独立验证恢复。
-- ADR-006：为什么先完成 Compose 闭环再迁移 Kubernetes。
+- ADR-006：为什么先完成 HTTP Mock Gateway 联合闭环，再替换为 Compose 和 Kubernetes。
 - ADR-007：如何处理紧急 rollback 后的 GitOps drift。
 - ADR-008：如何隔离 ground truth，避免 Eval 泄漏。
+- ADR-009：为什么 ReleaseGuard 聚焦领域闭环，不建设通用 Agent Runtime。
 
 ## 22. 最终成功标准
 
-当 ReleaseGuard 的 portfolio v1.0 达到以下状态时，项目可以认为完成：
+ReleaseGuard 有两个成功边界，不能再把所有价值推迟到最终版本。
+
+### Portfolio v0.1 成功标准
+
+- 单一 slow SQL 场景通过独立 HTTP Mock Gateway 跑通调查、建议、审批、幂等动作和恢复验证。
+- Agent 与 Platform 都有独立可说明的实现，又通过 OpenAPI 与 E2E 形成真实协作证据。
+- 至少包含 rollback、`HOLD`、`INCONCLUSIVE` 和恶意输入四条可重复路径。
+- Evidence、Proposal、Approval、Action、Verification 和 Report 可以按 investigation ID 追溯。
+- 陌生人能运行 fast demo，并明确知道哪些组件是模拟、哪些逻辑是真实实现。
+- 已发布 README、报告、录屏、已知限制和 `portfolio-v0.1.0` Tag。
+
+### Platform v1.0 成功标准
 
 - 能够识别 candidate-only 发布回归，并关联到部署与代码变更。
 - RCA 使用结构化 Evidence，不依赖没有来源的自由文本判断。
@@ -682,4 +600,4 @@ portfolio-v1.0.0
 - GitHub 中有清晰、真实的双方 Issue、PR、Review 和版本记录。
 - 陌生人能够根据中文文档运行核心 Demo，并理解成功与失败结果。
 
-最重要的是：双方都不应成为对方工作的辅助角色。Agent 依赖平台提供安全、可靠、可观测的执行环境；平台依赖 Agent提供证据化调查、策略化建议和可量化评测。两个 ownership 必须独立成立，同时在端到端闭环中互相依赖。
+最重要的是：Portfolio-first 不等于 Agent-only。双方都不应成为对方工作的辅助角色。Agent 依赖平台提供安全、可靠、可审计的 Gateway 与恢复证据；平台依赖 Agent 提供证据化调查、策略化建议和可量化评测。两个 ownership 必须从 v0.1 起独立成立，同时在端到端闭环中互相依赖。

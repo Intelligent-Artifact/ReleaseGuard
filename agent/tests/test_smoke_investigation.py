@@ -1,4 +1,4 @@
-"""确定性 mock 调查（CP0）流水线测试。
+"""确定性 mock 调查（Developer Preview）流水线测试。
 
 覆盖：正常回归→HOLD、数据缺失→INCONCLUSIVE、证据齐备→ROLLBACK_RELEASE、
 非可比指标不误判、证据全可溯源、输出确定可复现、Markdown 区分事实/推断/建议。
