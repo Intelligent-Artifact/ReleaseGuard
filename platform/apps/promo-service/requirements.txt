@@ -1,3 +1,5 @@
 # promo-service 运行依赖，版本固定以保证干净环境可复现。
 Flask==2.2.2
+# Flask 2.2.x 需要 Werkzeug 2.x；不锁会解析到移除 url_quote 的 3.x，导致导入失败。
+Werkzeug>=2.2.2,<3
 prometheus-client==0.14.1

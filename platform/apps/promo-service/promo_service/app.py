@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from flask import current_app, jsonify, request
+from flask import jsonify, request
 
 from releaseguard_common.checks import dependency_checks_from_env
 from releaseguard_common.config import ServiceInfo
-from releaseguard_common.web import ApiError, create_app
+from releaseguard_common.web import ApiError, create_app, service_logger
 
 
 SERVICE_INFO = ServiceInfo.from_env("promo-service", default_port=8003)
@@ -52,7 +52,7 @@ def apply_promotion():
         "discount_cents": discount_cents,
         "final_amount_cents": amount_cents - discount_cents,
     }
-    current_app.logger.info(
+    service_logger().info(
         "优惠码应用成功",
         extra={
             "event": "promotion_applied",

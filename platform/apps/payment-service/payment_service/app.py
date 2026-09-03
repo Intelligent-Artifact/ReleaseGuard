@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import secrets
 
-from flask import current_app, jsonify, request
+from flask import jsonify, request
 
 from releaseguard_common.checks import dependency_checks_from_env
 from releaseguard_common.config import ServiceInfo
-from releaseguard_common.web import ApiError, create_app
+from releaseguard_common.web import ApiError, create_app, service_logger
 
 
 SERVICE_INFO = ServiceInfo.from_env("payment-service", default_port=8002)
@@ -56,7 +56,7 @@ def authorize_payment():
         "payment_method": payment_method,
         "currency": "CNY",
     }
-    current_app.logger.info(
+    service_logger().info(
         "支付授权成功",
         extra={
             "event": "payment_authorized",

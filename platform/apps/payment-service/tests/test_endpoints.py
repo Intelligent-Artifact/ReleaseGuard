@@ -17,7 +17,7 @@ sys.path.insert(0, str(_APPS_ROOT / "payment-service"))
 from payment_service.app import app  # noqa: E402
 
 # 单元测试关注断言结果，关闭访问日志，避免测试输出被大量 JSON 日志淹没。
-logging.getLogger().disabled = True
+logging.disable(logging.CRITICAL)
 
 
 class PaymentServiceEndpointTests(unittest.TestCase):

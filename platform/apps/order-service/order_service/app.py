@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import secrets
 
-from flask import current_app, jsonify, request
+from flask import jsonify, request
 
 from releaseguard_common.checks import dependency_checks_from_env
 from releaseguard_common.config import ServiceInfo
-from releaseguard_common.web import ApiError, create_app
+from releaseguard_common.web import ApiError, create_app, service_logger
 
 
 SERVICE_INFO = ServiceInfo.from_env("order-service", default_port=8001)
@@ -86,7 +86,7 @@ def create_order():
         "amount_cents": total_amount_cents,
         "promo_code": promo_code,
     }
-    current_app.logger.info(
+    service_logger().info(
         "订单受理成功",
         extra={
             "event": "order_created",

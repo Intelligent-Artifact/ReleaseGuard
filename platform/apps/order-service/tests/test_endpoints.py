@@ -17,7 +17,7 @@ sys.path.insert(0, str(_APPS_ROOT / "order-service"))
 from order_service.app import app  # noqa: E402
 
 # 单元测试关注断言结果，关闭访问日志，避免测试输出被大量 JSON 日志淹没。
-logging.getLogger().disabled = True
+logging.disable(logging.CRITICAL)
 
 
 class OrderServiceEndpointTests(unittest.TestCase):
@@ -123,6 +123,14 @@ class OrderServiceEndpointTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.get_json()["error"]["code"], "INVALID_ORDER_ITEM")
+
+    def test_large_json_body_is_rejected(self) -> None:
+        response = self.client.post(
+            "/api/v1/orders",
+            data=b"x" * (64 * 1024 + 1),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 413)
 
 
 if __name__ == "__main__":

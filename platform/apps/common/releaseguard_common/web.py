@@ -12,9 +12,9 @@ import time
 from datetime import datetime, timezone
 from typing import Optional
 
-from flask import Flask, Response, g, jsonify, request
+from flask import Flask, Response, current_app, g, jsonify, request
 from prometheus_client import CONTENT_TYPE_LATEST
-from werkzeug.exceptions import HTTPException
+from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
 from .checks import ReadinessCheck
 from .config import ServiceInfo
@@ -50,6 +50,11 @@ def _request_id() -> str:
     return getattr(g, "request_id", "")
 
 
+def service_logger() -> logging.Logger:
+    """返回当前 Flask 应用的服务专属 logger，供业务端点记录结构化日志。"""
+    return current_app.extensions["releaseguard"]["logger"]
+
+
 def _error_response(code: str, message: str, status_code: int, details=None):
     payload = {
         "error": {
@@ -77,6 +82,10 @@ def create_app(
     logger = setup_logging(service_info)
     metrics = ServiceMetrics(service_info)
     checks = list(readiness_checks or [])
+    app.extensions["releaseguard"] = {
+        "service_info": service_info,
+        "logger": logger,
+    }
 
     @app.before_request
     def _prepare_request() -> None:
@@ -89,6 +98,12 @@ def create_app(
             request.headers.get("traceparent")
         ) or new_trace_context()
         g.start_time = time.perf_counter()
+        # Werkzeug 只对 form 解析强制 MAX_CONTENT_LENGTH，JSON 请求需要显式限制。
+        content_length = request.content_length
+        if content_length is not None and content_length > app.config[
+            "MAX_CONTENT_LENGTH"
+        ]:
+            raise RequestEntityTooLarge()
 
     @app.after_request
     def _observe_request(response: Response) -> Response:

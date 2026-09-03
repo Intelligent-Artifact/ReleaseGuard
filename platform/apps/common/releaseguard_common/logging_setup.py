@@ -78,9 +78,10 @@ class JsonFormatter(logging.Formatter):
 
 
 def setup_logging(service_info: ServiceInfo) -> logging.Logger:
-    """配置根 logger 并返回统一使用的 logger。
+    """配置服务专属 logger 并返回。
 
-    重复调用时会替换根 logger 的 handler，保证测试与热重载场景下不重复输出。
+    每个服务使用独立命名 logger（``releaseguard.<service>``）并关闭向 root 传播，
+    避免同一进程创建多个服务应用时，handler 被后创建的服务覆盖导致日志标签串服务。
     """
     # 容器与本地终端统一使用 UTF-8，保证中文日志不因平台编码差异而乱码。
     for stream in (sys.stdout, sys.stderr):
@@ -91,8 +92,9 @@ def setup_logging(service_info: ServiceInfo) -> logging.Logger:
             except (OSError, ValueError):
                 pass
 
-    logger = logging.getLogger()
+    logger = logging.getLogger(f"releaseguard.{service_info.name}")
     logger.setLevel(service_info.log_level)
+    logger.propagate = False
     for handler in list(logger.handlers):
         logger.removeHandler(handler)
     handler = logging.StreamHandler(sys.stdout)

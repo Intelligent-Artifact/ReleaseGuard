@@ -3,7 +3,14 @@
 from __future__ import annotations
 
 import re
+import sys
 import unittest
+from pathlib import Path
+
+
+# 允许在不设置 PYTHONPATH 的干净 shell 中直接运行 common 测试。
+_APPS_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(_APPS_ROOT / "common"))
 
 from releaseguard_common.trace import (
     TraceContext,
