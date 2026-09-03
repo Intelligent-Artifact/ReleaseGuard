@@ -119,6 +119,21 @@ class PaymentServiceEndpointTests(unittest.TestCase):
             response.get_json()["error"]["code"], "INVALID_PAYMENT_METHOD"
         )
 
+    def test_authorize_payment_rejects_non_string_method(self) -> None:
+        # 数组/对象等不可哈希类型若进入集合判断会抛 TypeError，应返回 400。
+        response = self.client.post(
+            "/api/v1/payments",
+            json={
+                "order_id": "ord_test_005",
+                "amount_cents": 100,
+                "payment_method": [],
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.get_json()["error"]["code"], "INVALID_PAYMENT_METHOD"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

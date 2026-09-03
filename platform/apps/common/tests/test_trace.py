@@ -47,6 +47,9 @@ class TraceContextTests(unittest.TestCase):
         self.assertIsNone(parse_traceparent(""))
         self.assertIsNone(parse_traceparent("01-" + ("a" * 32) + "-01"))
         self.assertIsNone(parse_traceparent("00-zzzz-0000-01"))
+        # W3C 禁止全零 trace-id 与 parent-id。
+        self.assertIsNone(parse_traceparent("00-" + ("0" * 32) + "-" + ("b" * 16) + "-01"))
+        self.assertIsNone(parse_traceparent("00-" + ("a" * 32) + "-" + ("0" * 16) + "-01"))
 
     def test_child_context_keeps_trace_id(self) -> None:
         context = TraceContext(

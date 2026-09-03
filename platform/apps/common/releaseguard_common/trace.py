@@ -64,6 +64,9 @@ def parse_traceparent(header: Optional[str]) -> Optional[TraceContext]:
     if not match:
         return None
     trace_id, parent_span_id, flags = match.groups()
+    # W3C tracecontext 明确禁止全零 trace-id 和全零 parent-id。
+    if trace_id == "0" * 32 or parent_span_id == "0" * 16:
+        return None
     return TraceContext(
         trace_id=trace_id,
         span_id=new_span_id(),

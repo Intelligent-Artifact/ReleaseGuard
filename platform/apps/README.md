@@ -50,7 +50,9 @@ environment/trace_id 等低基数标签。
 
 ## 本地运行
 
-前置条件：Python 3.10+。首次运行先在三个服务目录分别安装固定版本依赖：
+前置条件：已验证 Python 3.10–3.12（Docker 基础镜像为 python:3.12-slim）；
+暂不声明支持更高 Python 版本，避免在未验证环境上给出错误承诺。
+首次运行先在三个服务目录分别安装固定版本依赖：
 
 ```powershell
 cd order-service

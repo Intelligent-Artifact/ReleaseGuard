@@ -42,9 +42,12 @@ def authorize_payment():
         )
 
     payment_method = body.get("payment_method", "card")
-    if payment_method not in _ALLOWED_PAYMENT_METHODS:
+    if (
+        not isinstance(payment_method, str)
+        or payment_method not in _ALLOWED_PAYMENT_METHODS
+    ):
         raise ApiError(
-            "INVALID_PAYMENT_METHOD", f"不支持的支付方式: {payment_method}", 400
+            "INVALID_PAYMENT_METHOD", "支付方式必须是受支持的字符串", 400
         )
 
     payment_id = f"pay_{secrets.token_hex(6)}"
