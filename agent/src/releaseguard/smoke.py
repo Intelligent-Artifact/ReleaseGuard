@@ -56,6 +56,19 @@ SMOKE_INVESTIGATION_ID = "inv_cp0_demo_001"
 SMOKE_SYMPTOM = "candidate 的 p95 延迟显著高于 baseline，疑似发布回归"
 SMOKE_ENVIRONMENT = "demo"
 
+# 占位版本号：部署响应没有 previous / 完全没有部署时的兜底值。
+# 它们只是“无法比较”的标记，绝不作为回滚动作的 from/to 目标。
+UNKNOWN_BASELINE_VERSION = "unknown-baseline"
+UNKNOWN_CANDIDATE_VERSION = "unknown-candidate"
+
+# 无部署降级报告使用固定占位时间，保证“完全确定性”（不依赖 datetime.now）。
+FALLBACK_STARTED_AT = datetime(2026, 9, 2, 14, 36, 30, tzinfo=timezone.utc)
+
+
+def _is_placeholder_version(version: str | None) -> bool:
+    """占位版本（unknown-*）或空值不算明确的发布版本，不能用作回滚目标。"""
+    return not version or version.startswith("unknown-")
+
 
 # ---------------------------------------------------------------------------
 # 契约对象 → 结构化证据
@@ -77,7 +90,7 @@ def build_investigation(bundle: FixtureBundle) -> Investigation:
         investigation_id=SMOKE_INVESTIGATION_ID,
         environment=deployment.environment,
         service=deployment.service,
-        baseline_version=previous.version if previous else "unknown-baseline",
+        baseline_version=previous.version if previous else UNKNOWN_BASELINE_VERSION,
         candidate_version=current.version,
         deployment_id=deployment.source_refs[0] if deployment.source_refs else None,
         started_at=started_at,
@@ -113,6 +126,8 @@ def evidence_from_deployment(bundle: FixtureBundle) -> list[Evidence]:
             version=current.version,
             observed_at=deployment.generated_at,
             summary="；".join(parts) + "。",
+            # 部署证据来自本次调查刚读取的当前部署报文：fresh/complete/comparable 全真。
+            quality=EvidenceQuality(fresh=True, complete=True, comparable=True),
             refs=list(deployment.source_refs),
         )
     ]
@@ -120,18 +135,19 @@ def evidence_from_deployment(bundle: FixtureBundle) -> list[Evidence]:
 
 def evidence_from_metrics(
     bundle: FixtureBundle,
-) -> tuple[list[Evidence], list[str]]:
-    """把指标比较响应转换为证据，并返回判定为“回归”的指标名。
+) -> tuple[list[Evidence], list[str], list[str]]:
+    """把指标比较响应转换为证据，返回 (证据, 回归指标名, 回归证据 id)。
 
     只有 comparable 且样本量足够的指标才可能被判定为回归；
     不可比较/无数据会被如实记录，不会被当作正常。
     """
     metrics = bundle.metrics
     if metrics is None:
-        return [], []
+        return [], [], []
 
     evidence: list[Evidence] = []
     regressed: list[str] = []
+    regressed_ids: list[str] = []
     for item in metrics.metrics:
         baseline = item.baseline_value
         ratio = item.candidate_value / baseline if baseline else 0.0
@@ -139,19 +155,23 @@ def evidence_from_metrics(
         comparable = item.comparable and item.sample_count >= MIN_SAMPLE_COUNT
         is_regression = comparable and item.candidate_value > baseline * REGRESSION_RATIO
 
+        evidence_id = (
+            f"metric:{item.name.value}:{metrics.candidate}:{metrics.window}:"
+            f"{metrics.generated_at:%Y%m%d%H%M%S}"
+        )
         evidence.append(
             Evidence(
-                evidence_id=(
-                    f"metric:{item.name.value}:{metrics.candidate}:"
-                    f"{metrics.generated_at:%H%M%S}"
-                ),
+                evidence_id=evidence_id,
                 type=EvidenceType.METRIC,
                 source="ops-gateway:/api/v1/metrics/compare",
                 service=metrics.service,
                 version=metrics.candidate,
                 observed_at=metrics.generated_at,
-                # 契约声明不可比的数据，质量标记也要如实反映，不能当作正常。
-                quality=EvidenceQuality(comparable=item.comparable),
+                # 显式给出质量：比较响应是刚生成的、契约声明可比与否如实记录。
+                # 不依赖“默认全真”。
+                quality=EvidenceQuality(
+                    fresh=True, complete=True, comparable=item.comparable
+                ),
                 summary=(
                     f"{item.name.value}：candidate={item.candidate_value}{item.unit} "
                     f"vs baseline={item.baseline_value}{item.unit}"
@@ -166,7 +186,8 @@ def evidence_from_metrics(
         )
         if is_regression:
             regressed.append(item.name.value)
-    return evidence, regressed
+            regressed_ids.append(evidence_id)
+    return evidence, regressed, regressed_ids
 
 
 # ---------------------------------------------------------------------------
@@ -178,9 +199,15 @@ def build_finding(
     investigation: Investigation,
     evidence: list[Evidence],
     regressed_metrics: list[str],
+    regressed_evidence_ids: list[str],
     bundle: FixtureBundle,
 ) -> Finding | None:
-    """基于证据与回归判定形成带限制的根因判断；证据不足时返回 None。"""
+    """基于证据与回归判定形成带限制的根因判断；证据不足时返回 None。
+
+    finding.evidence_ids 只引用“支撑本次根因判断”的证据：部署证据 +
+    被判定为回归的指标证据。未回归/不可比的指标证据仍留在报告中作为事实，
+    但不作为根因结论的引用——避免结论引用“该指标未见回归”的自相矛盾。
+    """
     # 需要部署与至少一个可比较指标，才能形成“候选版本回归”的判断。
     present = {item.type for item in evidence}
     if (
@@ -211,15 +238,22 @@ def build_finding(
     root_cause = (
         f"候选版本 {current.version}（commit {current.commit_sha}）上线后，"
         f"指标 {regressed_summary} 出现仅 candidate 可观测的回归；"
-        f"主要假设为 v2 引入的变更导致后端延迟上升"
-        f"（方向疑似同步/数据库类查询），但缺少日志与链路证据，"
+        f"判断为本次发布变更对后端延迟产生不利影响，但缺少日志与链路证据，"
         f"无法定位到具体 SQL 语句或调用路径。"
     )
+
+    # 只引用支撑结论的证据（部署 + 回归指标）；详见函数 docstring。
+    evidence_ids = [
+        item.evidence_id
+        for item in evidence
+        if item.type is EvidenceType.DEPLOYMENT
+        or item.evidence_id in set(regressed_evidence_ids)
+    ]
     return Finding(
         affected_service=investigation.service,
         root_cause=root_cause,
         confidence=confidence,
-        evidence_ids=[item.evidence_id for item in evidence],
+        evidence_ids=evidence_ids,
         alternative_hypotheses=[
             AlternativeHypothesis(
                 hypothesis="与本次发布无关的下游依赖或数据库全局饱和",
@@ -230,6 +264,11 @@ def build_finding(
                 hypothesis="流量倾斜或测量噪声导致的假阳性",
                 confidence=0.10,
                 note="comparable=true 且样本量足够，但 candidate 权重低，仍需复现确认。",
+            ),
+            AlternativeHypothesis(
+                hypothesis="变更方向猜测：涉及同步/数据库类调用导致延迟上升",
+                confidence=0.10,
+                note="仅为方向性猜测，无日志/链路依据；需补充 trace/日志验证后才能采信。",
             ),
         ],
         limitations=[
@@ -266,6 +305,34 @@ def build_rollback_proposal(
     )
 
 
+def _context_consistent_evidence(
+    investigation: Investigation, evidence: list[Evidence]
+) -> list[Evidence]:
+    """只保留与本次调查上下文一致的证据（service / version 归属）供裁决使用。
+
+    CP1 引擎里证据可能来自不同服务、不同版本或历史窗口；裁决只允许把真正
+    属于本次调查（service 相同、version 落在 baseline/candidate 内）的证据
+    计入 rollback 判定，避免无关/过期证据被拼进结论。时间窗的强校验留给
+    CP1 引擎（investigation 具备明确窗口语义后）实现。
+    """
+    allowed_versions = {investigation.baseline_version, investigation.candidate_version}
+    return [
+        item
+        for item in evidence
+        if item.service == investigation.service
+        and (item.version is None or item.version in allowed_versions)
+    ]
+
+
+def _has_concrete_rollback_target(investigation: Investigation) -> bool:
+    """回滚目标必须明确且非空：from/to 都是真实版本（非 unknown-* 占位）且二者不同。"""
+    return (
+        not _is_placeholder_version(investigation.baseline_version)
+        and not _is_placeholder_version(investigation.candidate_version)
+        and investigation.baseline_version != investigation.candidate_version
+    )
+
+
 def decide(
     investigation: Investigation,
     evidence: list[Evidence],
@@ -277,9 +344,10 @@ def decide(
 
     1. finding 为空 → INCONCLUSIVE：部署/指标缺失、不可比或未检测到回归，
        不足以形成可执行判断（保持观察，不触发动作）；
-    2. 证据覆盖部署+指标+变更（git）且置信度达标 → ROLLBACK_RELEASE 建议，
-       但必须人工审批，Agent 不自动执行；
-    3. 其余（确认了 candidate 回归但缺变更证据）→ HOLD，补充证据后再决策。
+    2. 上下文一致的证据覆盖部署+指标+变更（git）、置信度达标，且
+       from/to 版本明确且不同 → ROLLBACK_RELEASE 建议，但必须人工审批；
+    3. 其余（缺变更证据 / 证据与本次调查上下文不一致 / 回滚目标未知）
+       → HOLD，不越权建议回滚。
 
     返回 (处置结论, 可执行建议, 说明文案)。
     """
@@ -291,19 +359,44 @@ def decide(
             "保持观察，不触发任何执行动作。",
         )
 
-    present = {item.type for item in evidence}
-    if ROLLBACK_REQUIRED_TYPES.issubset(present) and finding.confidence >= 0.6:
+    # 只对上下文一致的证据做类型裁决，避免无关证据触发回滚。
+    consistent = _context_consistent_evidence(investigation, evidence)
+    present = {item.type for item in consistent}
+    has_concrete_target = _has_concrete_rollback_target(investigation)
+
+    if (
+        ROLLBACK_REQUIRED_TYPES.issubset(present)
+        and finding.confidence >= 0.6
+        and has_concrete_target
+    ):
         return (
             Disposition.ROLLBACK_RELEASE,
             build_rollback_proposal(investigation, finding),
-            "部署+指标+代码变更三类证据齐备，按 grounding 规则建议回滚；"
+            "部署+指标+代码变更三类证据齐备、回滚目标明确，按 grounding 规则建议回滚；"
             "正式执行仍需人工审批并由平台独立验证。",
         )
+
+    # 落入 HOLD：把“为什么没有直接建议回滚”说清楚。
+    reasons: list[str] = []
+    if not has_concrete_target:
+        reasons.append(
+            "回滚目标不明确（from/to 版本未知占位或二者相同），无法构造回滚动作"
+        )
+    missing_types = sorted(
+        (t for t in ROLLBACK_REQUIRED_TYPES if t not in present), key=lambda t: t.value
+    )
+    if missing_types:
+        reasons.append(
+            "缺少 " + "、".join(t.value for t in missing_types) + " 类证据"
+        )
+    if len(consistent) != len(evidence):
+        reasons.append("部分证据与本次调查上下文不一致，已被剔除")
+    detail = "；".join(reasons) if reasons else "当前证据尚未满足回滚门槛"
     return (
         Disposition.HOLD,
         None,
-        "已确认 candidate 方向回归，但缺少代码变更（git）证据，"
-        "暂不直接建议回滚；建议补齐日志/trace/git 证据后再决策。",
+        f"已确认 candidate 方向回归，但 {detail}；"
+        "暂不直接建议回滚，建议补齐证据后由人工决策。",
     )
 
 
@@ -328,10 +421,12 @@ def run_smoke(bundle: FixtureBundle) -> IncidentReport:
 
     investigation = build_investigation(bundle)
     evidence = evidence_from_deployment(bundle)
-    metric_evidence, regressed = evidence_from_metrics(bundle)
+    metric_evidence, regressed, regressed_ids = evidence_from_metrics(bundle)
     evidence.extend(metric_evidence)
 
-    finding = build_finding(investigation, evidence, regressed, bundle)
+    finding = build_finding(
+        investigation, evidence, regressed, regressed_ids, bundle
+    )
     decision, proposal, message = decide(investigation, evidence, finding)
     status = (
         InvestigationStatus.INCONCLUSIVE
@@ -355,16 +450,18 @@ def _inconclusive_report(bundle: FixtureBundle) -> IncidentReport:
     if bundle.deployment is not None:
         investigation = build_investigation(bundle)
         evidence = evidence_from_deployment(bundle)
-        metric_evidence, _ = evidence_from_metrics(bundle)
+        metric_evidence, _, _ = evidence_from_metrics(bundle)
         evidence.extend(metric_evidence)
     else:
+        # 完全没有部署数据时无法给出 service/版本，用占位值；时间用固定值，
+        # 保持“完全确定性”（不依赖 datetime.now）。
         investigation = Investigation(
             investigation_id=SMOKE_INVESTIGATION_ID,
             environment=SMOKE_ENVIRONMENT,
             service="payment-service",
-            baseline_version="unknown-baseline",
-            candidate_version="unknown-candidate",
-            started_at=datetime.now(timezone.utc),
+            baseline_version=UNKNOWN_BASELINE_VERSION,
+            candidate_version=UNKNOWN_CANDIDATE_VERSION,
+            started_at=FALLBACK_STARTED_AT,
             symptom=SMOKE_SYMPTOM,
         )
         evidence = []
@@ -401,8 +498,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--fixtures-dir", default=None, help="共享契约 fixture 目录")
     parser.add_argument(
         "--output-dir",
-        default=str(default_output_dir()),
-        help="报告输出目录（默认 reports/local/agent）",
+        default=None,
+        help="报告输出目录（默认 <仓库根>/reports/local/agent；"
+        "在仓库外运行且配合 --fixtures-dir 时必须显式指定）",
     )
     args = parser.parse_args(argv)
 
@@ -459,7 +557,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  {disposition_line}")
 
     print("\n[4/4] 生成并保存报告")
-    out_dir = Path(args.output_dir)
+    # 延迟解析默认输出目录：只有真正需要写文件时才向上找仓库根。
+    # 这样即便配合 --fixtures-dir 在仓库外运行、只要显式给了 --output-dir 也可工作。
+    out_dir = Path(args.output_dir) if args.output_dir else default_output_dir()
     json_path, md_path = write_report(report, out_dir)
     print(f"  JSON     -> {json_path}")
     print(f"  Markdown -> {md_path}")

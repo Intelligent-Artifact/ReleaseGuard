@@ -19,6 +19,7 @@ from releaseguard.contracts import (
 from releaseguard.domain import (
     Disposition,
     Evidence,
+    EvidenceQuality,
     EvidenceType,
     Finding,
     IncidentReport,
@@ -27,7 +28,12 @@ from releaseguard.domain import (
     RiskLevel,
 )
 from releaseguard.report import render_markdown, to_json
-from releaseguard.smoke import decide, evidence_from_metrics, run_smoke
+from releaseguard.smoke import (
+    UNKNOWN_BASELINE_VERSION,
+    decide,
+    evidence_from_metrics,
+    run_smoke,
+)
 
 # 固定的演示时间与 commit，保持与 contracts/examples 语义一致。
 T0 = datetime(2026, 9, 2, 14, 36, 30, tzinfo=timezone.utc)
@@ -112,9 +118,10 @@ class Test确定性调查:
 
 class Test回归判定与降级:
     def test_fixture标记p95与错误率回归(self, shared_bundle):
-        _, regressed = evidence_from_metrics(shared_bundle)
+        _, regressed, regressed_ids = evidence_from_metrics(shared_bundle)
         assert "p95_latency" in regressed
         assert "error_rate" in regressed
+        assert len(regressed_ids) == len(regressed)  # 每个回归指标都有对应证据 id
 
     def test_不可比指标不判定为回归(self):
         bundle = load_shared_fixtures()
@@ -122,8 +129,9 @@ class Test回归判定与降级:
         bundle.metrics = _metrics_response(
             _metric("p95_latency", 100, 900, comparable=False)
         )
-        evidence, regressed = evidence_from_metrics(bundle)
+        evidence, regressed, regressed_ids = evidence_from_metrics(bundle)
         assert regressed == []
+        assert regressed_ids == []
         assert evidence and evidence[0].quality.comparable is False
 
     def test_指标缺失降级为INCONCLUSIVE(self):
@@ -133,6 +141,32 @@ class Test回归判定与降级:
         assert report.decision == Disposition.INCONCLUSIVE
         assert report.finding is None
         assert report.proposal is None
+
+    def test_finding只引用支撑结论的证据(self):
+        """混合指标：p95 回归 + availability 未回归。finding.evidence_ids 只应引用
+        部署证据与回归的 p95，未回归的 availability 仍留在报告事实中但不作结论引用。"""
+        bundle = load_shared_fixtures()
+        bundle.metrics = _metrics_response(
+            _metric("p95_latency", 121, 493),  # 回归（>1.2 倍）
+            _metric("availability", 0.999, 0.99),  # 数值下降但当前规则不判为回归
+        )
+        report = run_smoke(bundle)
+        assert report.finding is not None
+        p95_id = next(
+            e.evidence_id
+            for e in report.evidence
+            if e.type is EvidenceType.METRIC and "p95_latency" in e.evidence_id
+        )
+        avail_id = next(
+            e.evidence_id
+            for e in report.evidence
+            if e.type is EvidenceType.METRIC and "availability" in e.evidence_id
+        )
+        # availability 仍作为事实证据出现在报告中……
+        assert avail_id in {e.evidence_id for e in report.evidence}
+        # ……但回归结论不引用它（避免“结论引用未见回归的指标”自相矛盾）。
+        assert p95_id in report.finding.evidence_ids
+        assert avail_id not in report.finding.evidence_ids
 
 
 class Test处置裁决:
@@ -147,7 +181,12 @@ class Test处置裁决:
             symptom="p95 延迟回归",
         )
 
-    def _evidence_of(self, *types: EvidenceType) -> list[Evidence]:
+    def _evidence_of(
+        self,
+        *types: EvidenceType,
+        service: str = "payment-service",
+        version: str | None = "v2",
+    ) -> list[Evidence]:
         """按类型构造最小证据（用于裁决规则的白盒测试）。"""
         out: list[Evidence] = []
         for kind in types:
@@ -156,10 +195,13 @@ class Test处置裁决:
                     evidence_id=f"test:{kind.value}:001",
                     type=kind,
                     source=f"source-{kind.value}",
-                    service="payment-service",
-                    version="v2",
+                    service=service,
+                    version=version,
                     observed_at=T0,
                     summary=f"{kind.value} 证据",
+                    quality=EvidenceQuality(
+                        fresh=True, complete=True, comparable=True
+                    ),
                 )
             )
         return out
@@ -241,6 +283,46 @@ class Test处置裁决:
         assert decision == Disposition.INCONCLUSIVE
         assert proposal is None
         assert "不触发任何执行动作" in message
+
+    def test_baseline未知时不建议回滚(self):
+        """无 previous → baseline 为 unknown-baseline 占位：即使部署+指标+变更证据
+        齐备也只 HOLD，绝不构造指向占位版本的回滚动作。"""
+        investigation = self._investigation().model_copy(
+            update={"baseline_version": UNKNOWN_BASELINE_VERSION}
+        )
+        evidence = self._evidence_of(
+            EvidenceType.DEPLOYMENT, EvidenceType.METRIC, EvidenceType.GIT
+        )
+        finding = Finding(
+            affected_service="payment-service",
+            root_cause="candidate 方向回归",
+            confidence=0.9,
+            evidence_ids=[item.evidence_id for item in evidence],
+        )
+        decision, proposal, message = decide(investigation, evidence, finding)
+        assert decision == Disposition.HOLD
+        assert proposal is None
+        assert "回滚目标不明确" in message
+
+    def test_上下文不一致证据不触发回滚(self):
+        """证据的 service 与 investigation 不一致时不能拼进回滚判定 → 保守 HOLD。"""
+        investigation = self._investigation()
+        evidence = self._evidence_of(
+            EvidenceType.DEPLOYMENT,
+            EvidenceType.METRIC,
+            EvidenceType.GIT,
+            service="other-service",
+        )
+        finding = Finding(
+            affected_service="other-service",
+            root_cause="candidate 方向回归",
+            confidence=0.9,
+            evidence_ids=[item.evidence_id for item in evidence],
+        )
+        decision, proposal, message = decide(investigation, evidence, finding)
+        assert decision == Disposition.HOLD
+        assert proposal is None
+        assert "上下文不一致" in message
 
 
 class Test报告输出:

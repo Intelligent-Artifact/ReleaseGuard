@@ -61,6 +61,9 @@ PYTHONPATH=src python -m pytest            # 或 pip install -e ".[test]" 后直
 `.gitignore` 忽略，不会污染仓库）。可用 `--output-dir` 修改输出位置，用
 `RELEASEGUARD_FIXTURES_DIR` 环境变量覆盖 fixture 目录（便于 CI 接入平台方 mock）。
 
+> 在仓库外配合 `--fixtures-dir` / `RELEASEGUARD_FIXTURES_DIR` 直接使用平台方 mock
+> 目录时，默认输出目录无法定位（位于仓库内），请同时用 `--output-dir` 指定输出位置。
+
 ## 代码结构
 
 ```text

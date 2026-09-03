@@ -111,7 +111,11 @@ class RolloutState(BaseModel):
 
 
 class DeploymentResponse(BaseModel):
-    """GET /api/v1/deployments/{service} 的响应体（镜像 openapi.yaml）。"""
+    """GET /api/v1/deployments/{service} 的响应体（镜像 openapi.yaml）。
+
+    `warnings` / `source_refs` 在 openapi.yaml 中是 required（可为空数组但字段必须存在），
+    因此这里不设默认值：缺这两个字段的报文必须被契约校验拦截，防止静默漂移。
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -122,8 +126,8 @@ class DeploymentResponse(BaseModel):
     current: ReleaseRevision
     previous: ReleaseRevision | None = None
     rollout: RolloutState
-    warnings: list[str] = Field(default_factory=list)
-    source_refs: list[str] = Field(default_factory=list)
+    warnings: list[str]
+    source_refs: list[str]
 
 
 class MetricComparison(BaseModel):
@@ -152,8 +156,9 @@ class MetricsCompareResponse(BaseModel):
     candidate: str
     window: str
     metrics: list[MetricComparison] = Field(min_length=1)
-    warnings: list[str] = Field(default_factory=list)
-    source_refs: list[str] = Field(default_factory=list)
+    # 与 openapi.yaml 一致：required（可为空数组但字段必须存在），不设默认值。
+    warnings: list[str]
+    source_refs: list[str]
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +226,8 @@ class FixtureBundle:
     """一次性加载并解析共享契约 fixture 的结果。
 
     - deployment / metrics / rollback_request：成功解析后的契约对象；
+    - results：逐文件的解析状态（"PASS" / "FAIL" / "MISSING"，供冒烟输出按真实
+      解析结果展示，避免“文件存在但内容不合契约”时仍打印 PASS）；
     - errors：逐文件收集的失败信息（缺失文件、JSON 或字段不符合契约）。
     """
 
@@ -228,6 +235,7 @@ class FixtureBundle:
     deployment: DeploymentResponse | None = None
     metrics: MetricsCompareResponse | None = None
     rollback_request: RollbackRequest | None = None
+    results: dict[str, str] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
 
     @property
@@ -274,15 +282,18 @@ def load_shared_fixtures(explicit: Path | str | None = None) -> FixtureBundle:
         path = fixtures_dir / filename
         if not path.is_file():
             bundle.errors.append(f"缺少共享 fixture：{path}")
+            bundle.results[filename] = "MISSING"
             continue
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
             parsed = model.model_validate(payload)
         except json.JSONDecodeError as exc:
             bundle.errors.append(f"fixture 不是合法 JSON：{filename}（{exc}）")
+            bundle.results[filename] = "FAIL"
             continue
         except Exception as exc:  # pydantic.ValidationError 等
             bundle.errors.append(f"fixture 不符合 OpenAPI v0.1：{filename} -> {exc}")
+            bundle.results[filename] = "FAIL"
             continue
         if filename.startswith("deployment"):
             bundle.deployment = parsed  # type: ignore[assignment]
@@ -290,15 +301,19 @@ def load_shared_fixtures(explicit: Path | str | None = None) -> FixtureBundle:
             bundle.metrics = parsed  # type: ignore[assignment]
         else:
             bundle.rollback_request = parsed  # type: ignore[assignment]
+        bundle.results[filename] = "PASS"
 
     return bundle
 
 
 def fixture_checklines(bundle: FixtureBundle) -> list[str]:
-    """生成逐文件契约校验结果行（供冒烟输出与验收证据使用）。"""
+    """生成逐文件契约校验结果行（供冒烟输出与验收证据使用）。
+
+    状态按真实解析结果输出（PASS/FAIL/MISSING），不是只看文件是否存在——
+    避免“文件存在但内容不符合契约”时 stdout 仍先显示 PASS。
+    """
     lines: list[str] = []
     for filename, _ in _FIXTURE_MODELS:
-        path = bundle.fixtures_dir / filename
-        status = "PASS" if path.is_file() else "MISSING"
+        status = bundle.results.get(filename, "MISSING")
         lines.append(f"  [{status}] {filename}")
     return lines

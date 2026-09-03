@@ -107,13 +107,17 @@ class Investigation(BaseModel):
 
 
 class EvidenceQuality(BaseModel):
-    """证据质量：新鲜、完整、可比较，缺一不可才值得被引用。"""
+    """证据质量：新鲜、完整、可比较。
+
+    三项均需在构造证据时显式给出，不设“默认就是好”——无法回答时调用方必须
+    明说取值依据，而不是靠默认值假装证据可信。
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    fresh: bool = True
-    complete: bool = True
-    comparable: bool = True
+    fresh: bool
+    complete: bool
+    comparable: bool
 
 
 class Evidence(BaseModel):
@@ -128,7 +132,7 @@ class Evidence(BaseModel):
     version: str | None = None
     observed_at: TzDateTime
     summary: str
-    quality: EvidenceQuality = Field(default_factory=EvidenceQuality)
+    quality: EvidenceQuality
     value: float | None = None
     unit: str | None = None
     refs: list[str] = Field(default_factory=list)

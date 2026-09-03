@@ -115,3 +115,48 @@ class Test契约底层语义约束:
         payload["service"] = "Payment-Service_1"  # 违反 ^[a-z][a-z0-9-]{1,62}$
         with pytest.raises(ValidationError):
             DeploymentResponse.model_validate(payload)
+
+
+class Test契约必填字段漂移:
+    """openapi.yaml 里 DeploymentResponse/MetricsCompareResponse 的 warnings 与
+    source_refs 均为 required（可为空数组但字段必须存在），模型必须拦截缺失，
+    防止对契约的静默漂移。"""
+
+    def _drift_payload(self, model, resp, drop: str) -> dict:
+        payload = resp.model_dump()
+        payload.pop(drop)
+        return payload
+
+    def test_缺warnings的部署响应被拒绝(self, bundle):
+        with pytest.raises(ValidationError):
+            DeploymentResponse.model_validate(
+                self._drift_payload(DeploymentResponse, bundle.deployment, "warnings")
+            )
+
+    def test_缺source_refs的部署响应被拒绝(self, bundle):
+        with pytest.raises(ValidationError):
+            DeploymentResponse.model_validate(
+                self._drift_payload(DeploymentResponse, bundle.deployment, "source_refs")
+            )
+
+    def test_缺warnings的指标比较响应被拒绝(self, bundle):
+        with pytest.raises(ValidationError):
+            MetricsCompareResponse.model_validate(
+                self._drift_payload(MetricsCompareResponse, bundle.metrics, "warnings")
+            )
+
+    def test_缺source_refs的指标比较响应被拒绝(self, bundle):
+        with pytest.raises(ValidationError):
+            MetricsCompareResponse.model_validate(
+                self._drift_payload(MetricsCompareResponse, bundle.metrics, "source_refs")
+            )
+
+    def test_必填数组字段未退化回默认值(self, bundle):
+        """护栏：warnings/source_refs 必须是 required（无默认值）。
+        若有人重新加回 default_factory，此测试会失败，提示与 openapi.yaml 重新对齐。"""
+        for resp in (bundle.deployment, bundle.metrics):
+            fields = type(resp).model_fields
+            for field in ("warnings", "source_refs"):
+                assert fields[field].is_required(), (
+                    f"{type(resp).__name__}.{field} 不应有默认值（openapi 中为 required）"
+                )

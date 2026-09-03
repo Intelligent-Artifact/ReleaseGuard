@@ -108,11 +108,10 @@ def render_markdown(report: IncidentReport) -> str:
         lines.append(f"- 引用证据：{', '.join(proposal.evidence_ids)}")
         if proposal.expires_at is not None:
             lines.append(f"- 有效期至：{proposal.expires_at.isoformat()}")
+        if report.note:
+            lines.append(f"- 说明：{report.note}")
     else:
         lines.append(f"- `{report.decision.value}`：{report.note or '无建议'}")
-
-    if report.note and report.proposal is None:
-        lines.extend(["", "## 说明", "", report.note])
 
     return "\n".join(lines) + "\n"
 
