@@ -18,6 +18,17 @@
 
 只读身份与写入身份必须分离。所有变更类动作必须经过 allowlist 限制，具备幂等性和审计记录，并在执行后接受独立验证。
 
+## Demo 应用
+
+三个 demo 服务骨架已放在 [apps/](./apps/README.md)：
+
+- order-service（订单受理，端口 8001）；
+- payment-service（支付授权，端口 8002）；
+- promo-service（优惠计算，端口 8003）。
+
+每个服务统一提供 `/healthz`、`/readyz`、`/metrics`、`/version`，
+输出结构化 JSON 日志，并生成/传播 W3C `traceparent` 上下文。
+
 ## 初始任务
 
 1. 建立三个包含健康检查、指标和结构化日志的最小 Demo 服务。
