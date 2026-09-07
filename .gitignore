@@ -42,6 +42,8 @@ data/
 tmp/
 artifacts/
 reports/local/
+AGENTS.md
+CLAUDE.md
 
 # 本地 Docker 覆盖配置
 compose.override.yaml
