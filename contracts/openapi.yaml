@@ -258,6 +258,30 @@ components:
           minimum: 0
         comparable:
           type: boolean
+    Decision:
+      description: >-
+        调查结论，只表达判断、不直接改变平台状态。
+        v0.1 不使用 ABORT；ABORT 属于未来发布控制器可能产生的结果。
+      type: string
+      enum: [PROMOTE, HOLD, ROLLBACK, INCONCLUSIVE]
+    ActionType:
+      description: >-
+        v0.1 允许提交给 Gateway 的结构化动作类型；
+        只允许由获准的 ROLLBACK Decision 转换得到的 ROLLBACK_RELEASE。
+      type: string
+      enum: [ROLLBACK_RELEASE]
+    ActionStatus:
+      description: >-
+        动作执行状态。当前值与原 ActionResponse.status inline 枚举一致，
+        抽取为可复用 schema，避免动作状态与 RecoveryStatus 混用。
+      type: string
+      enum: [ACCEPTED, RUNNING, VERIFYING, SUCCEEDED, FAILED, VERIFICATION_FAILED]
+    RecoveryStatus:
+      description: >-
+        独立恢复验证的结论，由平台在 action 执行后重新取证得到，
+        不能复用 action 内部 success 标志。
+      type: string
+      enum: [RECOVERED, NOT_RECOVERED, INCONCLUSIVE]
     RollbackRequest:
       type: object
       additionalProperties: false
@@ -308,8 +332,7 @@ components:
         proposal_id:
           type: string
         status:
-          type: string
-          enum: [ACCEPTED, RUNNING, VERIFYING, SUCCEEDED, FAILED, VERIFICATION_FAILED]
+          $ref: '#/components/schemas/ActionStatus'
         target:
           type: object
           additionalProperties: false
