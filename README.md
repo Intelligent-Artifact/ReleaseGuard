@@ -40,6 +40,9 @@ ReleaseGuard 是一个由 AI 辅助的发布风险分析与策略门控处置平
 
 Agent 侧已经具备基于共享 fixture 的确定性调查种子，可以生成结构化 Evidence、Finding 和 JSON/Markdown 报告。该能力属于 Developer Preview，不单独作为正式作品集版本。
 
+Agent 侧另提供 LangGraph 最小调查 harness，支持可替换数据源与模型适配器、受限只读工具循环、证据校验和运行记录。
+当前使用 fixture 与确定性模型替身；运行方式见 [Agent 说明](agent/README.md#langgraph-最小调查-harness)，尚未完成 v0.1 的 HTTP 联调和真实模型接入。
+
 v0.1 将由双方共同交付：
 
 1. 冻结包含部署、指标、日志、Git、动作状态和恢复证据的 Agent–Gateway API。

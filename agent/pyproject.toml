@@ -5,12 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "releaseguard-agent"
 version = "0.1.0"
-description = "ReleaseGuard Agent Developer Preview：契约冒烟测试基线（领域模型 + 确定性 mock 调查）"
+description = "ReleaseGuard Agent：契约冒烟测试与 LangGraph 最小调查 harness"
 readme = "README.md"
 requires-python = ">=3.11"
-# Developer Preview 保持轻量：契约冒烟测试只依赖 pydantic，不引入 LangGraph / LangChain。
+# 复用既有数据模型，通过 LangGraph 编排离线调查。
 dependencies = [
   "pydantic>=2.10,<3",
+  "langgraph>=1.0,<2",
 ]
 
 [project.optional-dependencies]
@@ -18,6 +19,7 @@ test = ["pytest>=8.3,<9"]
 
 [project.scripts]
 releaseguard-smoke = "releaseguard.smoke:main"
+releaseguard-investigate = "releaseguard.harness:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
