@@ -41,13 +41,13 @@
 
 ### 3.1 接口缺口
 
-| 需要的能力 | 来源 | 现有状态 |
-|---|---|---|
-| 有边界 logs 查询 | #16 / G2 | 缺失 |
-| Git change / commit metadata 查询 | #16 / G2 | 缺失 |
-| 独立 post-action recovery verification | #33 / G3 | 缺失 |
-| action 幂等与冲突语义的显式契约 | #32 / G3 | 部分在示例中，未成 schema |
-| approval approve/reject/expire 生命周期接口 | #31 / G3 | 仅作为 rollback request 的嵌套字段 |
+| 需要的能力 | 来源 | 已有契约基础 | 仍缺失的语义 |
+|---|---|---|---|
+| 有边界 logs 查询 | #16 / G2 | 无 | 查询接口与 fixture |
+| Git change / commit metadata 查询 | #16 / G2 | 无 | 查询接口与 fixture |
+| 独立 post-action recovery verification | #33 / G3 | 无 | 查询接口与独立判定语义 |
+| action 幂等与冲突语义 | #32 / G3 | 已定义必填 `Idempotency-Key` header、`409 ActionConflict` response 与 `ACTION_ALREADY_RUNNING` 错误码 | 同 key 同 payload 重放、同 key 不同 payload、并发冲突等行为语义尚未显式定义 |
+| approval approve/reject/expire 生命周期 | #31 / G3 | `Approval` 作为 rollback request 嵌套字段存在 | 独立状态转换接口与过期/拒绝/scope 越界语义 |
 
 ### 3.2 Schema 缺口
 
@@ -57,13 +57,16 @@ v0.1 需要的核心 schema 中，以下仍未进入 OpenAPI 的稳定定义：
 - `RCA`（假设、证据引用、置信度、未知项）
 - `Decision`（`PROMOTE` / `HOLD` / `ROLLBACK` / `INCONCLUSIVE`）
 - `ActionType`（v0.1 只允许 `ROLLBACK_RELEASE`）
-- 明确的 `ActionStatus` 枚举
+- 可复用的 `ActionStatus` schema：当前 `ActionResponse.status` 已有 inline 枚举
+  `ACCEPTED / RUNNING / VERIFYING / SUCCEEDED / FAILED / VERIFICATION_FAILED`，
+  但尚未抽取为独立定义，也尚未与未来的 `RecoveryStatus` 明确解耦与迁移
 - 明确的 `RecoveryStatus` / `RecoveryResult`
 - 审批拒绝、过期与 scope 越界的稳定错误响应
 
 ### 3.3 指标方向语义缺口（#28）
 
 当前 `MetricComparison` 只有数值与 `comparable`，没有声明每个指标“哪个方向代表退化”。
+#28 的契约要求不仅是方向，还包括可让 Gateway 与 Agent 独立实现一致比较逻辑的完整语义：
 
 例如：
 
@@ -71,7 +74,15 @@ v0.1 需要的核心 schema 中，以下仍未进入 OpenAPI 的稳定定义：
 - `request_rate` 上升不代表退化；
 - `p95_latency` 上升才是退化。
 
-需要补充指标方向元数据或独立语义表，并让 Gateway/Agent 使用同一份定义。
+需要补充/明确的语义：
+
+- 每个指标的方向（lower is better / higher is better）；
+- 回归阈值与单位；
+- 比较窗口；
+- 最小样本量；
+- missing / uncomparable 行为；
+- 方向缺失或单位不匹配时稳定降级为 `INCONCLUSIVE`；
+- 让 Gateway/Agent 使用同一份定义，而不是各自硬编码。
 
 ## 4. 建议的拆分提交顺序
 
@@ -86,10 +97,11 @@ v0.1 需要的核心 schema 中，以下仍未进入 OpenAPI 的稳定定义：
    - 新增 logs 查询与 Git change 查询的 contract 与 fixture
 4. **动作生命周期与错误语义**
    - approve/reject/expire
-   - 幂等键、冲突、缺失、超时、部分数据的稳定错误码
-5. **示例与校验**
+   - 幂等键、冲突、缺失、超时、部分数据、schema mismatch 的稳定错误码
+5. **示例与负向 fixture**
    - 更新 `contracts/examples/`
-   - OpenAPI lint / schema 校验跑通
+   - 为正常、缺失、超时、恶意日志、recovery failure 建立显式 fixture
+   - 补充 OpenAPI lint / schema 校验
 
 ## 5. 需要双方先确认的开放问题
 
