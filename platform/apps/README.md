@@ -9,9 +9,12 @@ client / k6
             → promo-service（优惠计算）
 ```
 
-三个服务尚未通过 HTTP 互相调用。按照 portfolio-first 路线，v0.2 只正式支持
-`payment-service`，用于承载 baseline/candidate、真实流量和 slow SQL 场景；
-`order-service` 与 `promo-service` 作为历史原型保留，不构成当前交付或维护承诺。
+三个服务尚未通过 HTTP 互相调用。新的监控主线采用 Google Online Boutique，
+这里的 `order-service`、`payment-service` 与 `promo-service` 均作为历史原型保留，
+停止扩展业务功能，不再承担新版本的正式业务演示。
+
+以下端点、命令和测试描述现有原型行为，不适用于 Online Boutique。新应用的上游
+版本锁定、部署和遥测适配待按[平台 playbook](../../docs/DEVOPS_PLATFORM_PLAYBOOK.md)实现。
 
 ## 目录结构
 
@@ -53,14 +56,14 @@ environment/trace_id 等低基数标签。
 
 前置条件：已验证 Python 3.10–3.12（Docker 基础镜像为 python:3.12-slim）；
 暂不声明支持更高 Python 版本，避免在未验证环境上给出错误承诺。
-v0.2 主线只需在 payment-service 目录安装固定版本依赖：
+如需复现历史 payment-service 原型，在其目录安装固定版本依赖：
 
 ```powershell
 cd payment-service
 pip install -r requirements.txt
 ```
 
-启动主线服务：
+启动历史 payment-service 原型：
 
 ```powershell
 .\scripts\run.ps1 -Service payment-service -Port 18002
@@ -105,7 +108,7 @@ docker build -f payment-service/Dockerfile -t releaseguard/payment-service:v1 .
 docker build -f promo-service/Dockerfile -t releaseguard/promo-service:v1 .
 ```
 
-镜像内以非 root 用户（UID/GID 10001）运行，并带 Docker HEALTHCHECK。v0.2 主线只构建和验收 payment-service；其他镜像命令用于维护历史原型时参考。
+镜像内以非 root 用户（UID/GID 10001）运行，并带 Docker HEALTHCHECK。以上构建命令仅用于复现历史原型，不构成 Online Boutique 主线的部署方式。
 
 ## 环境变量
 
@@ -121,9 +124,9 @@ docker build -f promo-service/Dockerfile -t releaseguard/promo-service:v1 .
 | `RELEASEGUARD_DEPENDENCY_URLS` | 空 | 逗号分隔的上游基础地址，注入后写入 `/readyz` 检查 |
 | `RELEASEGUARD_LOG_LEVEL` | `INFO` | 日志级别 |
 
-## 下一步
+## 后续处理
 
-- 按 #29 修复共享库与 payment-service 的已知复评问题。
-- 用最小 Docker Compose 启动 payment-service、Ops Gateway 和 Prometheus。
-- 为 payment-service 增加可按版本启用、可幂等清理的 slow SQL 故障开关。
-- 只有后续已验收场景确实需要时，才为 order-service 或 promo-service 建立独立 Issue 并恢复维护。
+- 现有原型代码、测试和 Issue 记录保留；不因文档调整视为已修复或已关闭。
+- 旧 #29 等任务需要按新路线重新分类，历史缺陷若影响现有安全或可复现性则单独处理。
+- 停止为这些原型新增 Compose 主线和 slow SQL 业务功能，后续业务集成转向 Online Boutique。
+- 新主线从上游版本锁定、最小 Kubernetes 和 Redis 场景验证开始，见共同路线图。

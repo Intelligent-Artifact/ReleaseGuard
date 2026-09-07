@@ -2,15 +2,22 @@
 
 主要负责人：[@Manticore0918](https://github.com/Manticore0918)
 
-ReleaseGuard 是一个面向渐进式发布的 AI 辅助可靠性平台。Agent 负责调查、推理、
-建议与评测；Ops Gateway（平台侧）负责基础设施访问、权限、执行、幂等与审计。
+ReleaseGuard 的新主线是监控驱动的服务故障调查与受控处置。Agent 负责事件消费、
+取证、推理、建议与评测；Ops Gateway（平台侧）负责事件入口、外部访问和恢复验证，
+后续再增加审批、执行、幂等与审计。
 **Agent 不直接访问 Kubernetes 或执行任意命令**，只能通过 `../contracts/openapi.yaml`
 定义的版本化契约读取数据。
+
+**下文描述现有发布回归开发预览的实际运行方式。** 当前模型与规则仍依赖部署和
+baseline/candidate；Online Boutique 监控事件、无版本调查、真实 HTTP client 与真实模型
+尚待迁移。新增能力见[监控契约迁移计划](../contracts/MONITORING_CONTRACT_PLAN.md)，
+本次计划更新没有改变下面的 CLI、fixture 或测试行为。
 
 > 原有 `releaseguard-smoke` 入口交付 **Agent Developer Preview**。它提供一份可复现的
 > **Agent 契约冒烟测试**——在没有真实基础设施、没有 LLM、没有 LangGraph 的前提下，
 > 读取共享契约 fixture，完成一次确定性 mock 调查，并输出区分事实/推断/建议的报告。
-> Developer Preview 只作为开发基础，不单独构成正式作品集版本；v0.1 必须通过独立 HTTP Mock Gateway 与平台侧形成联合闭环。
+> Developer Preview 只作为开发基础，不单独构成正式作品集版本；新的 v0.1 必须完成
+> Online Boutique 真实告警、HTTP 取证、只读调查、人工恢复及独立验证。
 
 ## LangGraph 最小调查 harness
 
@@ -20,7 +27,7 @@ ReleaseGuard 是一个面向渐进式发布的 AI 辅助可靠性平台。Agent 
 
 当前交付范围：独立的 `GatewayClient` 接口、fixture 数据源替身、可替换的
 `ModelAdapter`、确定性模型替身、受限工具循环、上下文与证据校验，以及统一报告出口。
-当前没有 HTTP Gateway 实现、真实 LLM、审批、回滚执行或恢复验证，尚未达到 Portfolio v0.1 验收要求。
+当前 harness 没有 HTTP Gateway client、真实 LLM、审批、回滚执行或恢复验证，尚未达到新 Portfolio v0.1 验收要求。平台侧已有独立 CP0 Mock，但尚未接入此 harness。
 
 ```mermaid
 flowchart TD
@@ -81,7 +88,7 @@ CLI 每次生成独立调查 ID。正常结束（包括证据不足的 `INCONCLU
 - fixture 时间仅用于离线重放；尚未实现按实际时钟判断证据新鲜度、完整时间窗校验、
   SQL 级根因校验和进程崩溃后的 checkpoint 恢复。运行记录在调查结束时写盘。
 - 当前证据仅有部署与指标，结论最多为 `HOLD`，不会生成写动作。
-  `full` 模型与 HTTP Gateway 的实现将在后续 PR 中接入相同运行路径。
+  真实模型与监控 HTTP Gateway 将按新路线逐步接入并复用已有适配边界。
 
 ### 代码入口
 
@@ -177,7 +184,9 @@ agent/
 - 主流程对当前共享 fixture 的判定为 `HOLD`；`ROLLBACK_RELEASE` 路径由单元测试
   构造完整证据（deployment+metrics+git）覆盖，并验证其符合写契约 `RollbackRequest` 形状。
 
-## Developer Preview 退出条件对照
+## 历史 Developer Preview 退出条件对照
+
+以下为该开发预览保留的检查记录，不代表新监控主线或当前仓库全量安全审计的结果。
 
 - [x] Agent 能根据 fixture 生成一次模拟调查结果（`releaseguard-smoke`）；
 - [x] Agent 契约冒烟测试输出可复现（确定性、无随机、无网络）；

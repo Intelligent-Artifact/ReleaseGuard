@@ -2,45 +2,28 @@
 
 主要负责人：[@adminxue](https://github.com/adminxue)
 
-本目录用于存放 ReleaseGuard 的运行与可靠性平台，包括：
+本目录承载 ReleaseGuard 的运行与可靠性平台。新的业务载体计划采用 Google Online Boutique，平台方重点交付上游集成、监控告警、受限 Ops Gateway、故障注入、独立恢复验证和后续安全执行。
 
-- Demo 微服务和有状态依赖；
-- Docker Compose 与 Kubernetes 部署；
-- Helm、Argo CD 和 Argo Rollouts；
-- Prometheus、Grafana、Loki 和 OpenTelemetry；
-- 受约束的 Ops Gateway；
-- 工作负载生成和故障注入；
-- 策略强制执行、RBAC、动作审计和恢复验证。
+## 当前资产
+
+- [apps/](apps/README.md)：原先的 order/payment/promo 自研服务原型，保留运行说明，停止扩展业务功能。
+- [gateway/](gateway/README.md)：CP0 发布契约 HTTP Mock，保留兼容性冒烟用途。
+
+Online Boutique 与真实监控尚未在本次计划改动中部署；既有 Mock 不代表新主线完成。
+
+## 当前目标：v0.1 监控调查作品集
+
+1. G0：固定上游版本与镜像，验证最小 Kind 环境、购物流程、Redis 不可用信号、资源和 TTL 清理。
+2. G1：接入 Prometheus、Alertmanager、Loki、最小 Grafana 看板及 Gateway 事件入口，支持 Agent 自动创建唯一调查。
+3. G2：通过真实 HTTP 查询提供业务指标、依赖日志和 Kubernetes 资源证据，满足无发布 RCA。
+4. G3：交付人工恢复运行手册、操作记录、独立业务验证、重复评测及联合录屏。
+
+首版正式诊断范围限定购物车到 Redis 链路，部署必要上游依赖。首版 Agent 只读；v0.2 加强调查可靠性，v0.3 才引入已审批的单个无状态服务恢复动作，v1.0 再深化 GitOps 与发布专项。
 
 ## 边界
 
-平台只能暴露 `../contracts/openapi.yaml` 中定义的版本化结构化能力，不得执行 Agent 提供的任意命令。
+已实现 API 以 [OpenAPI](../contracts/openapi.yaml) 为准，新监控接口按 [迁移计划](../contracts/MONITORING_CONTRACT_PLAN.md) 在独立版本中冻结。禁止静默修改旧版本比较语义。
 
-只读身份与写入身份必须分离。所有变更类动作必须经过 allowlist 限制，具备幂等性和审计记录，并在执行后接受独立验证。
+Agent 不直接访问集群、遥测后端或注入工具，不得执行自由命令。人工操作记录与真实恢复证据分开；故障注入必须有范围、独立 TTL 与幂等清理。后续写动作才引入独立 Executor，并完整实施审批、幂等与审计。
 
-## Demo 应用
-
-三个 demo 服务骨架已放在 [apps/](./apps/README.md)：
-
-- order-service（订单受理，端口 8001）；
-- payment-service（支付授权，端口 8002）；
-- promo-service（优惠计算，端口 8003）。
-
-每个服务统一提供 `/healthz`、`/readyz`、`/metrics`、`/version`，
-输出结构化 JSON 日志，并生成/传播 W3C `traceparent` 上下文。
-
-这些服务是路线调整前已经合入的原型资产。当前只把 `payment-service` 纳入 v0.2 的正式支持范围；
-`order-service` 与 `promo-service` 可以保留用于后续场景，但不构成 v0.1/v0.2 的交付或维护承诺。
-
-## 当前任务：v0.1 联合 Portfolio MVP
-
-1. 与 Agent 负责人冻结 deployment、metrics、logs、Git、action 和 recovery 的最小契约。
-2. 将共享 fixture 包装成可独立启动的 HTTP Mock Gateway，确保 Agent 不能直接读取平台 fixture。
-3. 在 Gateway 侧实现审批材料校验、稳定 action ID、idempotency key 和 audit trail。
-4. 模拟 slow SQL 场景的 rollback 前后状态，并通过独立 recovery evidence 验证结果。
-5. 与 Agent 侧共同覆盖 rollback、`HOLD`、`INCONCLUSIVE` 和恶意日志四条跨进程 E2E 路径。
-6. 完成双方功能 PR、跨边界 review、重复评测和联合演示后发布 `portfolio-v0.1.0`。
-
-Docker Compose、真实 Prometheus 和业务服务从 v0.2 开始；Kubernetes、Helm 与 Argo 从 v1.0 开始，不阻塞 v0.1。
-
-完整计划参见 [DevOps / Platform 工程负责人执行手册](../docs/DEVOPS_PLATFORM_PLAYBOOK.md)。
+完整任务与验收见 [平台 playbook](../docs/DEVOPS_PLATFORM_PLAYBOOK.md)。
