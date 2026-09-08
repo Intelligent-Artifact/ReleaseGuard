@@ -4,8 +4,12 @@
 [`contracts/openapi.yaml`](../../contracts/openapi.yaml) 提供最小 HTTP Mock，
 并直接复用 [`contracts/examples/*.json`](../../contracts/examples/) 作为数据源。
 
-它只证明“Agent 可以跨 HTTP 边界消费平台契约”，不替代真实 Ops Gateway；
-真实网关与本地适配器属于 v0.1/v0.2 的实现范围。
+它用于验证旧发布契约的 HTTP 边界，不替代真实 Ops Gateway，也不代表 Agent harness
+已接入 HTTP。新的 v0.1 要求真实监控事件、只读取证及恢复验证，见
+[监控契约迁移计划](../../contracts/MONITORING_CONTRACT_PLAN.md)。
+
+本 Mock 的 rollback 端点仅模拟动作，不连接真实集群。新的 v0.1/v0.2 监控运行身份
+没有自动执行权限；审批与真实单动作执行在 v0.3 验收。以下为当前 Mock 的实际行为。
 
 ## 已实现端点
 
