@@ -2,7 +2,7 @@
 
 主要负责人：[@adminxue](https://github.com/adminxue)
 
-本目录承载 ReleaseGuard 的运行与可靠性平台。新的业务载体计划采用 Google Online Boutique，平台方重点交付上游集成、监控告警、受限 Ops Gateway、故障注入、独立恢复验证和后续安全执行。
+本目录承载 ReleaseGuard 的运行与可靠性平台。新的业务载体计划以外部、版本锁定的运行依赖方式集成 Google Online Boutique；ReleaseGuard 保持独立主仓库，默认使用固定上游制品与本地 Kustomize overlay，不复制完整业务源码，也不以 Online Boutique fork 替代本仓库。平台方重点交付上游锁定与校验、监控告警、受限 Ops Gateway、故障注入、独立恢复验证和后续安全执行。
 
 ## 当前资产
 
@@ -13,7 +13,7 @@ Online Boutique 与真实监控尚未在本次计划改动中部署；既有 Moc
 
 ## 当前目标：v0.1 监控调查作品集
 
-1. G0：固定上游版本与镜像，验证最小 Kind 环境、购物流程、Redis 不可用信号、资源和 TTL 清理。
+1. G0：固定上游 release、commit、清单与镜像 digest，提交锁定清单和 overlay，从干净 clone 验证最小 Kind 环境、购物流程、Redis 不可用信号、资源与 TTL 清理，并完成 `fork_required` 判断。
 2. G1：接入 Prometheus、Alertmanager、Loki、最小 Grafana 看板及 Gateway 事件入口，支持 Agent 自动创建唯一调查。
 3. G2：通过真实 HTTP 查询提供业务指标、依赖日志和 Kubernetes 资源证据，满足无发布 RCA。
 4. G3：交付人工恢复运行手册、操作记录、独立业务验证、重复评测及联合录屏。

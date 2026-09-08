@@ -2,7 +2,7 @@
 
 ReleaseGuard 是一个**监控驱动的服务故障调查与受控处置系统**。它接收运行告警，通过 Ops Gateway 关联指标、日志、依赖和平台状态，生成有证据的根因结论及建议，并独立验证恢复。
 
-业务应用计划采用 [Google Online Boutique](https://github.com/GoogleCloudPlatform/microservices-demo)。上游提供电商业务与流量生成器；本项目的原创成果是监控与告警、调查 Agent、证据契约、恢复验证和可复现评测。
+业务应用计划以外部、版本锁定的运行依赖方式集成 [Google Online Boutique](https://github.com/GoogleCloudPlatform/microservices-demo)。ReleaseGuard 保持为独立主仓库；默认直接使用经验证的上游发布镜像与清单，并在本仓库维护 Kustomize overlay，不复制完整上游源码，也不以 Online Boutique fork 替代本仓库。上游提供电商业务与流量生成器；本项目的原创成果是集成、监控与告警、调查 Agent、证据契约、恢复验证和可复现评测。
 
 ## 交付方向
 
@@ -56,6 +56,7 @@ Online Boutique 部署、监控查询 API、实时告警、现场演示命令、
 - 无数据不等于正常；人工操作成功、告警 resolved 或动作成功不等于业务恢复。
 - fixture/live、替身/真实模型、人工/TTL/自动执行分别标注，量化结果保留全部运行记录。
 - 上游应用与本项目贡献明确归属，自研业务原型保留但停止扩展。
+- G0 同时锁定上游 release、commit、镜像 digest、清单来源和许可证；只有证明确需修改业务源码时才建立独立 fork，且 fork 仍只是 ReleaseGuard 的运行依赖。
 
 ## 项目文档
 
@@ -68,4 +69,4 @@ Online Boutique 部署、监控查询 API、实时告警、现场演示命令、
 - [事故场景说明](scenarios/README.md)
 - [贡献与协作流程](CONTRIBUTING.md)
 
-下一步是 G0：验证并锁定 Online Boutique 版本、资源与 Redis 故障信号；随后冻结监控契约，完成 G1–G3 的真实告警、调查、恢复和作品集验收。
+下一步是 G0：验证并锁定 Online Boutique 版本、资源与 Redis 故障信号，提交可从干净 clone 重建的上游锁定清单与 overlay，并完成是否需要独立 fork 的书面判断；随后冻结监控契约，完成 G1–G3 的真实告警、调查、恢复和作品集验收。

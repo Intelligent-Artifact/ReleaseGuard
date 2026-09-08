@@ -6,7 +6,7 @@
 
 ## 1. 交付目标与当前状态
 
-你的首版成果是：一个可重建的 Online Boutique 环境，具有真实购物流量、业务 SLI、告警、证据查询、故障注入和独立恢复验证，能够支撑 Agent 完成一次实际调查。
+你的首版成果是：在独立的 ReleaseGuard 主仓库中，以固定上游制品和本地 overlay 构建一个可重建的 Online Boutique 环境，具有真实购物流量、业务 SLI、告警、证据查询、故障注入和独立恢复验证，能够支撑 Agent 完成一次实际调查。
 
 作品集首先展示完整运行链路和你的独立贡献；后续通过遥测质量、故障恢复、安全执行和 GitOps 实验增加技术深度。电商业务由上游提供，你负责运行与可靠性工程。
 
@@ -24,13 +24,26 @@ Agent 负责人负责事件消费、调查状态、工具 client、证据校验�
 
 ### 3.1 上游与维护方式
 
-采用 [GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo) 作为被监控应用。上游提供购物流程、服务依赖和 Locust 流量生成器；本项目的 README、演示与制品说明要明确其来源。
+采用 [GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo) 作为外部、版本锁定的被监控应用。ReleaseGuard 保持为独立主仓库；上游提供购物流程、服务依赖和 Locust 流量生成器，本项目的 README、演示与制品说明要明确其来源。
 
 - G0 选择并验证固定 release，记录 commit、镜像 digest、清单来源和许可证；不预先宣称某个未测试版本可用。
-- 默认使用上游发布镜像与清单，通过本地 Kustomize overlay 保存命名空间、资源、采集与演示差异。
-- 不复制整份业务源码进本仓库；按需保存可复现下载/校验流程。必须补埋点时保留最小补丁、基准 commit、构建方法和补丁理由。
+- 默认使用上游发布镜像与清单，通过本地 Kustomize overlay 保存命名空间、资源、采集与演示差异；不使用浮动远程 base。
+- 不复制整份业务源码进本仓库，不使用 Git submodule，也不以 Online Boutique fork 替代 ReleaseGuard；按需保存可复现下载/校验流程。
+- 优先用 overlay、exporter、采集适配或合成检查补足遥测。只有这些方式无法解决已验证的源码级缺口时才建立独立 fork；fork 仅作为运行依赖，并保留 base commit、最小补丁、构建方法、补丁理由和上游同步策略。
 - 保留上游许可证和必要 NOTICE，第三方源文件及许可证原文不改写；集成说明和自行新增注释使用中文。
 - 上游升级以独立任务完成，重跑健康、注入、证据和恢复检查；不能在录屏前临时切换浮动版本。
+
+G0 按以下顺序决策，未取得源码级缺口证据时 `fork_required` 保持为 `false`：
+
+```text
+固定上游发布制品并部署
+  → 验证业务、Redis 故障和遥测缺口
+  → overlay / exporter / 采集适配 / 合成检查是否足够？
+      → 是：不 fork，提交锁定清单与 overlay
+      → 否：记录源码级缺口并复审，再创建独立 fork 和最小补丁
+```
+
+锁定清单至少记录仓库 URL、release、commit、清单 URL 或路径及校验值、每个实际镜像 digest、许可证/NOTICE 状态、`fork_required`，以及在需要 fork 时的 fork URL 与 base commit。实际集群镜像、渲染清单或 fork base 与锁定值不一致时，该次运行不能计入 live 验收。
 
 上游官方开发指南支持 Kind、Minikube 与 Docker Desktop Kubernetes。本项目以 **本地 Kind** 作为首选验收环境，G0 记录操作系统、容器运行时、CPU 架构和网络条件。无需先部署 GKE；镜像拉取和多服务开销需要实际验证。[官方开发指南](https://github.com/GoogleCloudPlatform/microservices-demo/blob/main/docs/development-guide.md)
 
@@ -46,7 +59,11 @@ Agent 负责人负责事件消费、调查状态、工具 client、证据校验�
 
 | 建议位置 | 内容 |
 |---|---|
-| `platform/online-boutique/` | 上游锁定清单、来源说明、下载校验与 Kustomize overlay |
+| `platform/online-boutique/README.md` | 中文说明上游归属、集成方式、升级与 fork 决策 |
+| `platform/online-boutique/upstream-lock.yaml` | release、commit、清单校验、镜像 digest、许可证及 `fork_required` |
+| `platform/online-boutique/base/` | 固定来源的 Kustomize base 入口，不保存浮动引用或整份业务源码 |
+| `platform/online-boutique/overlays/local-kind/` | namespace、资源、采集与演示所需的本地差异 |
+| `platform/online-boutique/scripts/` | 可复现获取、校验和实际部署身份检查 |
 | `platform/observability/` | Prometheus 规则、Alertmanager、Loki、Grafana 看板；后续 OTel/Tempo |
 | `platform/workload/` | Locust 配置、合成业务检查、预热与采样参数 |
 | `platform/gateway/` | 保留 CP0 Mock，增加监控事件、真实只读适配器和验证器 |
@@ -210,7 +227,7 @@ Gateway Executor 必须验证：allowlist、操作者权限、提案有效期、
 
 | 阶段 | 平台任务 | 退出证据 |
 |---|---|---|
-| G0 | 锁定上游、最小 Kind、业务/Redis 故障验证、TTL 与资源检查 | 覆盖矩阵、锁定清单、原始采样和恢复记录 |
+| G0 | 锁定上游、最小 Kind、干净 clone 重建、业务/Redis 故障验证、fork 判断、TTL 与资源检查 | 覆盖矩阵、锁定清单、重建记录、`fork_required` 决策、原始采样和恢复记录 |
 | G1 | Prometheus/Alertmanager/Loki、Gateway 事件与查询、最小看板 | 真告警到唯一调查的 HTTP 链路 |
 | G2 | 真实证据适配、scope/时间窗/错误语义，与 Agent 复验 | 多源 RCA 所需证据可追溯，缺失不伪装 |
 | G3 | 人工运行手册、独立验证、E2E、录屏和环境重建 | 首版验证矩阵、业务恢复曲线与双方签收 |
@@ -222,11 +239,11 @@ v0.2 新增的服务无可用实例、依赖延迟、CPU 节流和配置故障�
 
 ## 12. CI 与验证
 
-首版 CI 聚焦：旧契约兼容、新契约 fixture、Gateway 参数/事件去重、真实数据适配与恢复判定。Kubernetes 清单渲染、配置检查和针对改动的镜像构建随实际资产加入。
+首版 CI 聚焦：旧契约兼容、新契约 fixture、Gateway 参数/事件去重、真实数据适配与恢复判定。Kubernetes 清单渲染、锁定清单 schema、远程来源校验和针对改动的镜像构建随实际资产加入；普通 CI 不依赖个人 fork 的未锁定分支。
 
 live E2E 在隔离的受支持环境执行，外部贡献 PR 不接触部署凭据。真实模型使用独立受控运行，普通 CI 使用确定性替身。每次发布保存上游 digest、规则、场景、流量、代码 commit 与实际命令输出。
 
-首版验收至少包括：从干净 clone 启动；真实告警自动触发；重复投递去重；无数据显式失败；Agent 无写权限；TTL 在注入器退出后仍清理；人工恢复后业务验证；操作成功但未恢复；连续 3 次注入/恢复/清理。
+首版验收至少包括：从 ReleaseGuard 干净 clone 依据锁定清单和 overlay 启动；实际部署身份与锁定值一致；真实告警自动触发；重复投递去重；无数据显式失败；Agent 无写权限；TTL 在注入器退出后仍清理；人工恢复后业务验证；操作成功但未恢复；连续 3 次注入/恢复/清理。
 
 v0.2 补充 Gateway/Agent 重启、积压消费、日志/trace 延迟和告警风暴。v0.3 补充审批重放、不同 payload 冲突、并发目标、状态变化、执行响应丢失及存储故障。
 
@@ -240,7 +257,7 @@ v0.2 补充 Gateway/Agent 重启、积压消费、日志/trace 延迟和告警�
 - 从干净环境启动、运行 live demo、fixture 验证、停止与清理的确切命令。
 - 资源需求、镜像获取和模型凭据前置条件，区分首次联网安装与后续运行。
 - 一次真实告警、一次假恢复拒绝、一次清理记录。
-- 上游归属说明、你的功能 PR、对 Agent 的 review 和联合 E2E 记录。
+- 上游锁定清单、overlay 差异、fork 决策与归属说明，以及你的功能 PR、对 Agent 的 review 和联合 E2E 记录。
 
 v0.1 不用完整 tracing、Argo 或云部署阻塞发布；技术附录在对应版本加入一次可复现实验和前后对比，避免只罗列工具名称。
 
@@ -261,11 +278,11 @@ v0.1 不用完整 tracing、Argo 或云部署阻塞发布；技术附录在对�
 
 ## 15. 首批任务与完成定义
 
-优先把上游锁定与 G0 实验、监控/告警、Gateway 契约、真实证据适配、注入/清理、恢复验证和展示材料拆成独立可 review 的工作项。接口先由双方签收；功能与集成分成小 PR。
+优先把上游锁定/校验与 overlay、G0 实验和 fork 判断、监控/告警、Gateway 契约、真实证据适配、注入/清理、恢复验证和展示材料拆成独立可 review 的工作项。接口先由双方签收；功能与集成分成小 PR。创建独立 fork 或扩大上游源码补丁范围前先复审，不把它混入普通部署 PR。
 
 - [ ] 满足当前阶段的共同 Gate，实际环境与报告中的架构一致。
 - [ ] Agent 负责人能够用同一 fixture 和真实接口复验，不依赖你的私人脚本或文件。
 - [ ] 业务症状、依赖证据和恢复结果可追溯；告警/动作成功均不替代业务验证。
 - [ ] 注入有范围、TTL、幂等清理和冲突处理，失败也保留结果。
-- [ ] 上游归属、集成差异、资源和限制明确，未完成的能力没有被标为已交付。
+- [ ] 上游锁定清单、实际部署身份、归属、overlay 差异、fork 决策、资源和限制明确，未完成的能力没有被标为已交付。
 - [ ] 中文文档、配置、测试、展示和双方贡献记录同步完成。
